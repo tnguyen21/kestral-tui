@@ -105,6 +105,102 @@ func (f *Fetcher) FetchSessions() ([]SessionInfo, error) {
 	return sessions, nil
 }
 
+// FetchAgents parses tmux gt-* sessions into agent info, enriched with
+// hooked issue data from bd. This mirrors gastown's FetchWorkers pattern.
+func (f *Fetcher) FetchAgents() ([]AgentDetail, error) {
+	sessions, err := f.FetchSessions()
+	if err != nil {
+		return nil, err
+	}
+
+	// Pre-fetch assigned issues: assignee path -> (id, title)
+	assigned := f.fetchAssignedIssues()
+
+	now := time.Now()
+	var agents []AgentDetail
+	for _, s := range sessions {
+		if !strings.HasPrefix(s.Name, "gt-") {
+			continue
+		}
+
+		parts := strings.SplitN(s.Name, "-", 3)
+		if len(parts) != 3 {
+			continue
+		}
+		rig := parts[1]
+		name := parts[2]
+
+		// Determine role
+		role := "polecat"
+		switch name {
+		case "witness":
+			role = "witness"
+		case "refinery":
+			role = "refinery"
+		case "mayor":
+			role = "mayor"
+		}
+
+		var age time.Duration
+		if s.Activity > 0 {
+			age = now.Sub(time.Unix(s.Activity, 0))
+		}
+
+		// Status based on activity age
+		status := "idle"
+		if s.Activity > 0 {
+			switch {
+			case age < 5*time.Minute:
+				status = "working"
+			case age < 30*time.Minute:
+				status = "stale"
+			default:
+				status = "stuck"
+			}
+		}
+
+		ad := AgentDetail{
+			Name:    name,
+			Rig:     rig,
+			Role:    role,
+			Status:  status,
+			AgeSecs: int64(age.Seconds()),
+		}
+
+		// Look up hooked issue for this agent
+		assignee := fmt.Sprintf("%s/polecats/%s", rig, name)
+		if issue, ok := assigned[assignee]; ok {
+			ad.IssueID = issue.ID
+			ad.IssueTitle = issue.Title
+		}
+
+		agents = append(agents, ad)
+	}
+	return agents, nil
+}
+
+// fetchAssignedIssues returns a map of assignee -> issue for all in_progress issues.
+func (f *Fetcher) fetchAssignedIssues() map[string]IssueDetail {
+	result := make(map[string]IssueDetail)
+
+	stdout, err := f.runBdCmd("list", "--status=in_progress", "--json")
+	if err != nil {
+		return result
+	}
+
+	var issues []IssueDetail
+	if err := json.Unmarshal(stdout.Bytes(), &issues); err != nil {
+		return result
+	}
+
+	for _, issue := range issues {
+		if issue.Assignee != "" {
+			result[issue.Assignee] = issue
+		}
+	}
+	return result
+}
+
 // FetchConvoys runs bd list --type=convoy --status=open --json in TownRoot.
 func (f *Fetcher) FetchConvoys() ([]ConvoyInfo, error) {
 	stdout, err := f.runBdCmd("list", "--type=convoy", "--status=open", "--json")

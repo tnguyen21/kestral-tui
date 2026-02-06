@@ -40,3 +40,14 @@ type SessionInfo struct {
 	Name     string
 	Activity int64 // unix timestamp
 }
+
+// AgentDetail holds enriched agent info for the TUI agents pane.
+type AgentDetail struct {
+	Name       string `json:"name"`
+	Rig        string `json:"rig"`
+	Role       string `json:"role"`    // witness, refinery, polecat
+	Status     string `json:"status"`  // working, stale, stuck, idle
+	AgeSecs    int64  `json:"age_sec"` // seconds since last activity
+	IssueID    string `json:"issue_id"`
+	IssueTitle string `json:"issue_title"`
+}
