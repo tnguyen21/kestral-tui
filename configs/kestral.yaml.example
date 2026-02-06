@@ -1,0 +1,20 @@
+# Kestral TUI Configuration
+# Copy to ~/.config/kestral/kestral.yaml and customize as needed.
+
+# SSH listen port (1-65535)
+port: 2222
+
+# Path to Gas Town workspace
+town_root: ~/gt
+
+# Directory containing SSH host keys
+host_key_dir: ~/.ssh
+
+# Polling intervals in seconds
+poll_interval:
+  # How often to refresh rig status
+  status: 10
+  # How often to refresh agent status
+  agents: 5
+  # How often to refresh convoy status
+  convoys: 15
