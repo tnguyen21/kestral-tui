@@ -19,6 +19,7 @@ const (
 	PaneMail
 	PaneCI
 	PaneLogs
+	PaneWitness
 )
 
 // Pane is the interface that all TUI panes implement.

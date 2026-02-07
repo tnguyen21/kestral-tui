@@ -38,6 +38,7 @@ func New(cfg config.Config) Model {
 	panes := []pane.Pane{
 		pane.NewDashboard(),
 		pane.NewAgentsPane(),
+		pane.NewWitnessPane(),
 	}
 
 	return Model{
@@ -73,6 +74,7 @@ func (m Model) Init() tea.Cmd {
 		fetchStatusCmd(m.fetcher),
 		fetchAgentsCmd(m.fetcher),
 		fetchConvoysCmd(m.fetcher),
+		fetchWitnessesCmd(m.fetcher),
 	)
 }
 
@@ -104,6 +106,8 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, fetchAgentsCmd(m.fetcher)
 	case data.ConvoyTickMsg:
 		return m, fetchConvoysCmd(m.fetcher)
+	case data.WitnessTickMsg:
+		return m, fetchWitnessesCmd(m.fetcher)
 
 	// Data update messages — forward to all panes and schedule next poll.
 	case pane.StatusUpdateMsg:
@@ -123,6 +127,12 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		cmds := m.forwardToAllPanes(msg)
 		cmds = append(cmds, data.ScheduleConvoyPoll(
 			time.Duration(m.config.PollInterval.Convoys)*time.Second))
+		return m, tea.Batch(cmds...)
+
+	case pane.WitnessUpdateMsg:
+		cmds := m.forwardToAllPanes(msg)
+		cmds = append(cmds, data.ScheduleWitnessPoll(
+			time.Duration(m.config.PollInterval.Witnesses)*time.Second))
 		return m, tea.Batch(cmds...)
 	}
 
@@ -172,6 +182,7 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			fetchStatusCmd(m.fetcher),
 			fetchAgentsCmd(m.fetcher),
 			fetchConvoysCmd(m.fetcher),
+			fetchWitnessesCmd(m.fetcher),
 		)
 	}
 
@@ -384,5 +395,33 @@ func fetchConvoysCmd(f *data.Fetcher) tea.Cmd {
 			progress[c.ID] = [2]int{done, len(issues)}
 		}
 		return pane.ConvoyUpdateMsg{Convoys: convoys, Progress: progress}
+	}
+}
+
+// fetchWitnessesCmd fetches witness heartbeat data and returns a pane.WitnessUpdateMsg.
+func fetchWitnessesCmd(f *data.Fetcher) tea.Cmd {
+	return func() tea.Msg {
+		details, err := f.FetchWitnesses()
+		now := time.Now()
+		witnesses := make([]pane.WitnessInfo, len(details))
+		for i, d := range details {
+			var lastHeartbeat time.Duration
+			if d.LastHeartbeat > 0 {
+				lastHeartbeat = now.Sub(time.Unix(d.LastHeartbeat, 0))
+			}
+			var uptime time.Duration
+			if d.SessionCreated > 0 {
+				uptime = now.Sub(time.Unix(d.SessionCreated, 0))
+			}
+			witnesses[i] = pane.WitnessInfo{
+				Rig:           d.Rig,
+				Status:        d.Status,
+				LastHeartbeat: lastHeartbeat,
+				PolecatCount:  d.PolecatCount,
+				Uptime:        uptime,
+				HasSession:    d.HasSession,
+			}
+		}
+		return pane.WitnessUpdateMsg{Witnesses: witnesses, Err: err}
 	}
 }

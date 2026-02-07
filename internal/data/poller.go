@@ -10,6 +10,7 @@ import (
 type StatusTickMsg time.Time
 type AgentTickMsg time.Time
 type ConvoyTickMsg time.Time
+type WitnessTickMsg time.Time
 
 // Result messages carry fetched data back to the model.
 type StatusUpdateMsg struct {
@@ -70,4 +71,11 @@ func FetchConvoysCmd(fetcher *Fetcher) tea.Cmd {
 		convoys, err := fetcher.FetchConvoys()
 		return ConvoyUpdateMsg{Convoys: convoys, Err: err}
 	}
+}
+
+// ScheduleWitnessPoll returns a tea.Tick command for the next witness poll.
+func ScheduleWitnessPoll(interval time.Duration) tea.Cmd {
+	return tea.Tick(interval, func(t time.Time) tea.Msg {
+		return WitnessTickMsg(t)
+	})
 }
