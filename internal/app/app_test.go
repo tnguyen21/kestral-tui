@@ -29,8 +29,8 @@ func sized(m Model, w, h int) Model {
 func TestNew(t *testing.T) {
 	m := testModel()
 
-	if len(m.panes) != 9 {
-		t.Fatalf("expected 9 panes, got %d", len(m.panes))
+	if len(m.panes) != 10 {
+		t.Fatalf("expected 10 panes, got %d", len(m.panes))
 	}
 	if m.panes[0].ID() != pane.PaneDashboard {
 		t.Errorf("pane 0 should be Dashboard, got %d", m.panes[0].ID())
@@ -50,14 +50,17 @@ func TestNew(t *testing.T) {
 	if m.panes[5].ID() != pane.PaneResources {
 		t.Errorf("pane 5 should be Resources, got %d", m.panes[5].ID())
 	}
-	if m.panes[6].ID() != pane.PaneNewIssue {
-		t.Errorf("pane 6 should be NewIssue, got %d", m.panes[6].ID())
+	if m.panes[6].ID() != pane.PaneHistory {
+		t.Errorf("pane 6 should be History, got %d", m.panes[6].ID())
 	}
-	if m.panes[7].ID() != pane.PaneMail {
-		t.Errorf("pane 7 should be Mail, got %d", m.panes[7].ID())
+	if m.panes[7].ID() != pane.PaneNewIssue {
+		t.Errorf("pane 7 should be NewIssue, got %d", m.panes[7].ID())
 	}
-	if m.panes[8].ID() != pane.PaneWitness {
-		t.Errorf("pane 8 should be Witness, got %d", m.panes[8].ID())
+	if m.panes[8].ID() != pane.PaneMail {
+		t.Errorf("pane 8 should be Mail, got %d", m.panes[8].ID())
+	}
+	if m.panes[9].ID() != pane.PaneWitness {
+		t.Errorf("pane 9 should be Witness, got %d", m.panes[9].ID())
 	}
 	if m.activePane != 0 {
 		t.Errorf("activePane should start at 0, got %d", m.activePane)
@@ -160,20 +163,27 @@ func TestTabKey(t *testing.T) {
 		t.Errorf("after 5th tab: activePane = %d, want 5", m.activePane)
 	}
 
-	// Tab forward: 5 -> 6 (NewIssue)
+	// Tab forward: 5 -> 6 (History)
 	newM, _ = m.Update(tea.KeyMsg{Type: tea.KeyTab})
 	m = newM.(Model)
 	if m.activePane != 6 {
 		t.Errorf("after 6th tab: activePane = %d, want 6", m.activePane)
 	}
 
-	// From pane 6 (NewIssue/input pane), tab is captured by the pane.
-	// Verify wrap from a non-input pane.
-	m.activePane = 5
+	// Tab forward: 6 -> 7 (NewIssue)
 	newM, _ = m.Update(tea.KeyMsg{Type: tea.KeyTab})
 	m = newM.(Model)
-	if m.activePane != 6 {
-		t.Errorf("tab from 5: activePane = %d, want 6", m.activePane)
+	if m.activePane != 7 {
+		t.Errorf("after 7th tab: activePane = %d, want 7", m.activePane)
+	}
+
+	// From pane 7 (NewIssue/input pane), tab is captured by the pane.
+	// Verify wrap from a non-input pane.
+	m.activePane = 6
+	newM, _ = m.Update(tea.KeyMsg{Type: tea.KeyTab})
+	m = newM.(Model)
+	if m.activePane != 7 {
+		t.Errorf("tab from 6: activePane = %d, want 7", m.activePane)
 	}
 }
 
@@ -181,11 +191,11 @@ func TestShiftTabKey(t *testing.T) {
 	m := testModel()
 	m = sized(m, 80, 24)
 
-	// Shift+tab wraps backward: 0 -> 8 (last pane)
+	// Shift+tab wraps backward: 0 -> 9 (last pane)
 	newM, _ := m.Update(tea.KeyMsg{Type: tea.KeyShiftTab})
 	m = newM.(Model)
-	if m.activePane != 8 {
-		t.Errorf("shift+tab from 0: activePane = %d, want 8", m.activePane)
+	if m.activePane != 9 {
+		t.Errorf("shift+tab from 0: activePane = %d, want 9", m.activePane)
 	}
 }
 
@@ -235,7 +245,7 @@ func TestNumberKeys(t *testing.T) {
 		t.Errorf("after '6': activePane = %d, want 5", m.activePane)
 	}
 
-	// Press "7" to go to new issue pane
+	// Press "7" to go to history pane
 	newM, _ = m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'7'}})
 	m = newM.(Model)
 	if m.activePane != 6 {
@@ -434,6 +444,25 @@ func TestPRUpdateForwarding(t *testing.T) {
 	}
 }
 
+func TestHistoryUpdateForwarding(t *testing.T) {
+	m := testModel()
+	m = sized(m, 80, 24)
+
+	msg := pane.HistoryUpdateMsg{
+		ClosedBeads: []data.ClosedBeadInfo{
+			{ID: "kt-abc", Title: "Fix bug", Status: "closed", ClosedAt: "2026-02-07T01:00:00Z"},
+		},
+		Convoys: []data.AllConvoyInfo{
+			{ID: "cv-1", Title: "Convoy 1", Status: "closed"},
+		},
+	}
+
+	_, cmd := m.Update(msg)
+	if cmd == nil {
+		t.Error("should schedule next history poll")
+	}
+}
+
 func TestConvoyUpdateForwarding(t *testing.T) {
 	m := testModel()
 	m = sized(m, 80, 24)
@@ -474,6 +503,14 @@ func TestRefineryTickTriggersCmd(t *testing.T) {
 	_, cmd := m.Update(data.RefineryTickMsg(time.Now()))
 	if cmd == nil {
 		t.Error("RefineryTickMsg should trigger a fetch command")
+	}
+}
+
+func TestHistoryTickTriggersCmd(t *testing.T) {
+	m := testModel()
+	_, cmd := m.Update(data.HistoryTickMsg(time.Now()))
+	if cmd == nil {
+		t.Error("HistoryTickMsg should trigger a fetch command")
 	}
 }
 
@@ -571,6 +608,9 @@ func TestViewRendersTabBar(t *testing.T) {
 	}
 	if !containsText(v, "PRs") {
 		t.Error("View should contain PRs tab")
+	}
+	if !containsText(v, "History") {
+		t.Error("View should contain History tab")
 	}
 }
 

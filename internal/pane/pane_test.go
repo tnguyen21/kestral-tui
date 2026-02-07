@@ -85,7 +85,10 @@ func TestPaneIDValues(t *testing.T) {
 	if PanePRs != 3 {
 		t.Errorf("PanePRs = %d, want 3", PanePRs)
 	}
-	if PaneLogs != 8 {
-		t.Errorf("PaneLogs = %d, want 8", PaneLogs)
+	if PaneHistory != 7 {
+		t.Errorf("PaneHistory = %d, want 7", PaneHistory)
+	}
+	if PaneLogs != 9 {
+		t.Errorf("PaneLogs = %d, want 9", PaneLogs)
 	}
 }

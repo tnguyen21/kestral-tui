@@ -15,6 +15,7 @@ type RefineryTickMsg time.Time
 type ResourceTickMsg time.Time
 type WitnessTickMsg time.Time
 type PRTickMsg time.Time
+type HistoryTickMsg time.Time
 
 // Result messages carry fetched data back to the model.
 type StatusUpdateMsg struct {
@@ -60,6 +61,13 @@ func FetchAgentsCmd(fetcher *Fetcher) tea.Cmd {
 		sessions, err := fetcher.FetchSessions()
 		return AgentUpdateMsg{Sessions: sessions, Err: err}
 	}
+}
+
+// ScheduleHistoryPoll returns a tea.Tick command for the next history poll.
+func ScheduleHistoryPoll(interval time.Duration) tea.Cmd {
+	return tea.Tick(interval, func(t time.Time) tea.Msg {
+		return HistoryTickMsg(t)
+	})
 }
 
 // ScheduleConvoyPoll returns a tea.Tick command for the next convoy poll.

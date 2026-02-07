@@ -19,6 +19,7 @@ const (
 	PaneConvoys
 	PaneMayor
 	PaneMail
+	PaneHistory
 	PaneCI
 	PaneLogs
 	PaneResources

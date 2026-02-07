@@ -565,6 +565,34 @@ func (f *Fetcher) FetchConvoys() ([]ConvoyInfo, error) {
 	return convoys, nil
 }
 
+// FetchClosedBeads runs bd list --status=closed --json in TownRoot.
+func (f *Fetcher) FetchClosedBeads() ([]ClosedBeadInfo, error) {
+	stdout, err := f.runBdCmd("list", "--status=closed", "--json")
+	if err != nil {
+		return nil, fmt.Errorf("listing closed beads: %w", err)
+	}
+
+	var beads []ClosedBeadInfo
+	if err := json.Unmarshal(stdout.Bytes(), &beads); err != nil {
+		return nil, fmt.Errorf("parsing closed beads: %w", err)
+	}
+	return beads, nil
+}
+
+// FetchAllConvoys runs gt convoy list --all --json and returns all convoys.
+func (f *Fetcher) FetchAllConvoys() ([]AllConvoyInfo, error) {
+	stdout, err := runCmd(cmdTimeout, "gt", "convoy", "list", "--all", "--json")
+	if err != nil {
+		return nil, fmt.Errorf("listing all convoys: %w", err)
+	}
+
+	var convoys []AllConvoyInfo
+	if err := json.Unmarshal(stdout.Bytes(), &convoys); err != nil {
+		return nil, fmt.Errorf("parsing all convoys: %w", err)
+	}
+	return convoys, nil
+}
+
 // FetchTrackedIssues runs bd dep list <convoyID> -t tracks --json, then
 // bd show <ids> --json to get full issue details.
 func (f *Fetcher) FetchTrackedIssues(convoyID string) ([]IssueDetail, error) {

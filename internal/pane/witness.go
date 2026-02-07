@@ -225,17 +225,6 @@ func formatWitnessDetail(w WitnessInfo, width int) string {
 	return theme.MutedStyle.Render(TruncateWithEllipsis(line, width))
 }
 
-func formatUptime(d time.Duration) string {
-	switch {
-	case d < time.Hour:
-		return fmt.Sprintf("%dm", int(d.Minutes()))
-	case d < 24*time.Hour:
-		return fmt.Sprintf("%dh%dm", int(d.Hours()), int(d.Minutes())%60)
-	default:
-		return fmt.Sprintf("%dd%dh", int(d.Hours()/24), int(d.Hours())%24)
-	}
-}
-
 func witnessStatusIcon(status string) string {
 	switch status {
 	case "alive":

@@ -188,22 +188,4 @@ func TestWitnessPaneViewZeroSize(t *testing.T) {
 	}
 }
 
-func TestFormatUptime(t *testing.T) {
-	tests := []struct {
-		name string
-		d    time.Duration
-		want string
-	}{
-		{"minutes", 30 * time.Minute, "30m"},
-		{"hours", 2*time.Hour + 15*time.Minute, "2h15m"},
-		{"days", 26*time.Hour + 30*time.Minute, "1d2h"},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			got := formatUptime(tt.d)
-			if got != tt.want {
-				t.Errorf("formatUptime(%v) = %q, want %q", tt.d, got, tt.want)
-			}
-		})
-	}
-}
+
