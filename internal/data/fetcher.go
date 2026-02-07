@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os/exec"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -199,6 +200,123 @@ func (f *Fetcher) fetchAssignedIssues() map[string]IssueDetail {
 		}
 	}
 	return result
+}
+
+// FetchResources collects per-tmux-session CPU and memory usage
+// by querying tmux for session panes and ps for process metrics.
+func (f *Fetcher) FetchResources() ([]ResourceInfo, error) {
+	// Step 1: Get session -> pane PIDs mapping from tmux
+	stdout, err := runCmd(tmuxCmdTimeout, "tmux", "list-panes", "-a",
+		"-F", "#{session_name}|#{pane_pid}|#{session_created}|#{session_activity}")
+	if err != nil {
+		return nil, fmt.Errorf("listing tmux panes: %w", err)
+	}
+
+	type sessionMeta struct {
+		panePIDs []int
+		created  int64
+		activity int64
+	}
+	sessions := make(map[string]*sessionMeta)
+
+	for _, line := range strings.Split(strings.TrimSpace(stdout.String()), "\n") {
+		if line == "" {
+			continue
+		}
+		parts := strings.SplitN(line, "|", 4)
+		if len(parts) < 4 {
+			continue
+		}
+		name := parts[0]
+		pid, _ := strconv.Atoi(parts[1])
+		created, _ := strconv.ParseInt(parts[2], 10, 64)
+		activity, _ := strconv.ParseInt(parts[3], 10, 64)
+
+		if _, ok := sessions[name]; !ok {
+			sessions[name] = &sessionMeta{created: created, activity: activity}
+		}
+		sessions[name].panePIDs = append(sessions[name].panePIDs, pid)
+		if activity > sessions[name].activity {
+			sessions[name].activity = activity
+		}
+	}
+
+	// Step 2: Get all processes
+	stdout, err = runCmd(tmuxCmdTimeout, "ps", "-e", "-o", "pid,ppid,pcpu,rss", "--no-headers")
+	if err != nil {
+		return nil, fmt.Errorf("listing processes: %w", err)
+	}
+
+	type proc struct {
+		pid  int
+		ppid int
+		cpu  float64
+		rss  int64 // KB
+	}
+	children := make(map[int][]int)
+	procs := make(map[int]*proc)
+
+	for _, line := range strings.Split(strings.TrimSpace(stdout.String()), "\n") {
+		fields := strings.Fields(line)
+		if len(fields) < 4 {
+			continue
+		}
+		p := &proc{}
+		p.pid, _ = strconv.Atoi(fields[0])
+		p.ppid, _ = strconv.Atoi(fields[1])
+		p.cpu, _ = strconv.ParseFloat(fields[2], 64)
+		p.rss, _ = strconv.ParseInt(fields[3], 10, 64)
+
+		procs[p.pid] = p
+		children[p.ppid] = append(children[p.ppid], p.pid)
+	}
+
+	// Step 3: Walk process tree from each session's pane PIDs
+	var collectDescendants func(pid int, seen map[int]bool)
+	collectDescendants = func(pid int, seen map[int]bool) {
+		if seen[pid] {
+			return
+		}
+		seen[pid] = true
+		for _, child := range children[pid] {
+			collectDescendants(child, seen)
+		}
+	}
+
+	now := time.Now()
+	var resources []ResourceInfo
+
+	for name, meta := range sessions {
+		seen := make(map[int]bool)
+		for _, pid := range meta.panePIDs {
+			collectDescendants(pid, seen)
+		}
+
+		var totalCPU float64
+		var totalRSS int64
+		for pid := range seen {
+			if p, ok := procs[pid]; ok {
+				totalCPU += p.cpu
+				totalRSS += p.rss
+			}
+		}
+
+		var uptime time.Duration
+		if meta.created > 0 {
+			uptime = now.Sub(time.Unix(meta.created, 0))
+		}
+
+		resources = append(resources, ResourceInfo{
+			SessionName:  name,
+			CPU:          totalCPU,
+			MemoryMB:     float64(totalRSS) / 1024.0,
+			UptimeSecs:   int64(uptime.Seconds()),
+			ProcessCount: len(seen),
+			LastActivity: meta.activity,
+		})
+	}
+
+	return resources, nil
 }
 
 // FetchConvoys runs bd list --type=convoy --status=open --json in TownRoot.

@@ -51,3 +51,13 @@ type AgentDetail struct {
 	IssueID    string `json:"issue_id"`
 	IssueTitle string `json:"issue_title"`
 }
+
+// ResourceInfo holds per-session resource usage data.
+type ResourceInfo struct {
+	SessionName  string  `json:"session_name"`
+	CPU          float64 `json:"cpu"`         // aggregate CPU %
+	MemoryMB     float64 `json:"memory_mb"`   // aggregate RSS in MB
+	UptimeSecs   int64   `json:"uptime_secs"` // session uptime in seconds
+	ProcessCount int     `json:"proc_count"`  // processes under session
+	LastActivity int64   `json:"last_activity"` // unix timestamp of last output
+}

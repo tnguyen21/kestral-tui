@@ -14,6 +14,7 @@ type PaneID int
 const (
 	PaneDashboard PaneID = iota
 	PaneAgents
+	PaneResources
 	PaneConvoys
 	PaneMayor
 	PaneMail
