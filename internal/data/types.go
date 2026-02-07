@@ -35,6 +35,25 @@ type IssueDetail struct {
 	UpdatedAt string `json:"updated_at"`
 }
 
+// ClosedBeadInfo represents a closed bead from bd list --status=closed --json.
+type ClosedBeadInfo struct {
+	ID        string `json:"id"`
+	Title     string `json:"title"`
+	Status    string `json:"status"`
+	IssueType string `json:"issue_type"`
+	Assignee  string `json:"assignee"`
+	CreatedAt string `json:"created_at"`
+	ClosedAt  string `json:"closed_at"`
+}
+
+// AllConvoyInfo represents a convoy from gt convoy list --all --json.
+type AllConvoyInfo struct {
+	ID        string `json:"id"`
+	Title     string `json:"title"`
+	Status    string `json:"status"`
+	CreatedAt string `json:"created_at"`
+}
+
 // SessionInfo represents a parsed tmux session.
 type SessionInfo struct {
 	Name     string

@@ -39,6 +39,7 @@ func New(cfg config.Config) Model {
 		pane.NewDashboard(),
 		pane.NewAgentsPane(),
 		pane.NewConvoysPane(),
+		pane.NewHistoryPane(),
 		pane.NewNewIssuePane(),
 	}
 
@@ -75,6 +76,7 @@ func (m Model) Init() tea.Cmd {
 		fetchStatusCmd(m.fetcher),
 		fetchAgentsCmd(m.fetcher),
 		fetchConvoysCmd(m.fetcher),
+		fetchHistoryCmd(m.fetcher),
 		fetchRigsCmd(m.fetcher),
 	)
 }
@@ -107,6 +109,8 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, fetchAgentsCmd(m.fetcher)
 	case data.ConvoyTickMsg:
 		return m, fetchConvoysCmd(m.fetcher)
+	case data.HistoryTickMsg:
+		return m, fetchHistoryCmd(m.fetcher)
 
 	// Data update messages — forward to all panes and schedule next poll.
 	case pane.StatusUpdateMsg:
@@ -125,6 +129,12 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case pane.ConvoyUpdateMsg:
 		cmds := m.forwardToAllPanes(msg)
 		cmds = append(cmds, data.ScheduleConvoyPoll(
+			time.Duration(m.config.PollInterval.Convoys)*time.Second))
+		return m, tea.Batch(cmds...)
+
+	case pane.HistoryUpdateMsg:
+		cmds := m.forwardToAllPanes(msg)
+		cmds = append(cmds, data.ScheduleHistoryPoll(
 			time.Duration(m.config.PollInterval.Convoys)*time.Second))
 		return m, tea.Batch(cmds...)
 
@@ -202,6 +212,7 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			fetchStatusCmd(m.fetcher),
 			fetchAgentsCmd(m.fetcher),
 			fetchConvoysCmd(m.fetcher),
+			fetchHistoryCmd(m.fetcher),
 		)
 	}
 
@@ -389,6 +400,25 @@ func fetchAgentsCmd(f *data.Fetcher) tea.Cmd {
 			}
 		}
 		return pane.AgentUpdateMsg{Agents: agents, Err: err}
+	}
+}
+
+// fetchHistoryCmd fetches closed beads and all convoys for the history pane.
+func fetchHistoryCmd(f *data.Fetcher) tea.Cmd {
+	return func() tea.Msg {
+		beads, beadErr := f.FetchClosedBeads()
+		convoys, convoyErr := f.FetchAllConvoys()
+		var err error
+		if beadErr != nil {
+			err = beadErr
+		} else if convoyErr != nil {
+			err = convoyErr
+		}
+		return pane.HistoryUpdateMsg{
+			ClosedBeads: beads,
+			Convoys:     convoys,
+			Err:         err,
+		}
 	}
 }
 
