@@ -38,6 +38,7 @@ func New(cfg config.Config) Model {
 	panes := []pane.Pane{
 		pane.NewDashboard(),
 		pane.NewAgentsPane(),
+		pane.NewPRsPane(),
 	}
 
 	return Model{
@@ -73,6 +74,7 @@ func (m Model) Init() tea.Cmd {
 		fetchStatusCmd(m.fetcher),
 		fetchAgentsCmd(m.fetcher),
 		fetchConvoysCmd(m.fetcher),
+		fetchPRsCmd(m.fetcher),
 	)
 }
 
@@ -104,6 +106,8 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, fetchAgentsCmd(m.fetcher)
 	case data.ConvoyTickMsg:
 		return m, fetchConvoysCmd(m.fetcher)
+	case data.PRTickMsg:
+		return m, fetchPRsCmd(m.fetcher)
 
 	// Data update messages — forward to all panes and schedule next poll.
 	case pane.StatusUpdateMsg:
@@ -123,6 +127,12 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		cmds := m.forwardToAllPanes(msg)
 		cmds = append(cmds, data.ScheduleConvoyPoll(
 			time.Duration(m.config.PollInterval.Convoys)*time.Second))
+		return m, tea.Batch(cmds...)
+
+	case pane.PRUpdateMsg:
+		cmds := m.forwardToAllPanes(msg)
+		cmds = append(cmds, data.SchedulePRPoll(
+			time.Duration(m.config.PollInterval.PRs)*time.Second))
 		return m, tea.Batch(cmds...)
 	}
 
@@ -172,6 +182,7 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			fetchStatusCmd(m.fetcher),
 			fetchAgentsCmd(m.fetcher),
 			fetchConvoysCmd(m.fetcher),
+			fetchPRsCmd(m.fetcher),
 		)
 	}
 
@@ -384,5 +395,13 @@ func fetchConvoysCmd(f *data.Fetcher) tea.Cmd {
 			progress[c.ID] = [2]int{done, len(issues)}
 		}
 		return pane.ConvoyUpdateMsg{Convoys: convoys, Progress: progress}
+	}
+}
+
+// fetchPRsCmd fetches open PRs and returns a pane.PRUpdateMsg.
+func fetchPRsCmd(f *data.Fetcher) tea.Cmd {
+	return func() tea.Msg {
+		prs, err := f.FetchPullRequests()
+		return pane.PRUpdateMsg{PRs: prs, Err: err}
 	}
 }

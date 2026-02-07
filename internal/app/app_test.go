@@ -29,14 +29,17 @@ func sized(m Model, w, h int) Model {
 func TestNew(t *testing.T) {
 	m := testModel()
 
-	if len(m.panes) != 2 {
-		t.Fatalf("expected 2 panes, got %d", len(m.panes))
+	if len(m.panes) != 3 {
+		t.Fatalf("expected 3 panes, got %d", len(m.panes))
 	}
 	if m.panes[0].ID() != pane.PaneDashboard {
 		t.Errorf("pane 0 should be Dashboard, got %d", m.panes[0].ID())
 	}
 	if m.panes[1].ID() != pane.PaneAgents {
 		t.Errorf("pane 1 should be Agents, got %d", m.panes[1].ID())
+	}
+	if m.panes[2].ID() != pane.PanePRs {
+		t.Errorf("pane 2 should be PRs, got %d", m.panes[2].ID())
 	}
 	if m.activePane != 0 {
 		t.Errorf("activePane should start at 0, got %d", m.activePane)
@@ -111,6 +114,13 @@ func TestTabKey(t *testing.T) {
 		t.Errorf("after tab: activePane = %d, want 1", m.activePane)
 	}
 
+	// Tab again to PRs pane
+	newM, _ = m.Update(tea.KeyMsg{Type: tea.KeyTab})
+	m = newM.(Model)
+	if m.activePane != 2 {
+		t.Errorf("after second tab: activePane = %d, want 2", m.activePane)
+	}
+
 	// Tab wraps around
 	newM, _ = m.Update(tea.KeyMsg{Type: tea.KeyTab})
 	m = newM.(Model)
@@ -123,11 +133,11 @@ func TestShiftTabKey(t *testing.T) {
 	m := testModel()
 	m = sized(m, 80, 24)
 
-	// Shift+tab wraps backward
+	// Shift+tab wraps backward (0 -> 2 with 3 panes)
 	newM, _ := m.Update(tea.KeyMsg{Type: tea.KeyShiftTab})
 	m = newM.(Model)
-	if m.activePane != 1 {
-		t.Errorf("shift+tab from 0: activePane = %d, want 1", m.activePane)
+	if m.activePane != 2 {
+		t.Errorf("shift+tab from 0: activePane = %d, want 2", m.activePane)
 	}
 }
 
@@ -149,11 +159,18 @@ func TestNumberKeys(t *testing.T) {
 		t.Errorf("after '1': activePane = %d, want 0", m.activePane)
 	}
 
-	// Press "3" - no pane 3 exists, should stay
+	// Press "3" to go to PRs pane
 	newM, _ = m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'3'}})
 	m = newM.(Model)
-	if m.activePane != 0 {
-		t.Errorf("after '3' (nonexistent): activePane = %d, want 0", m.activePane)
+	if m.activePane != 2 {
+		t.Errorf("after '3': activePane = %d, want 2", m.activePane)
+	}
+
+	// Press "4" - no pane 4 exists, should stay
+	newM, _ = m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'4'}})
+	m = newM.(Model)
+	if m.activePane != 2 {
+		t.Errorf("after '4' (nonexistent): activePane = %d, want 2", m.activePane)
 	}
 }
 
@@ -316,6 +333,22 @@ func TestAgentUpdateForwarding(t *testing.T) {
 	}
 }
 
+func TestPRUpdateForwarding(t *testing.T) {
+	m := testModel()
+	m = sized(m, 80, 24)
+
+	msg := pane.PRUpdateMsg{
+		PRs: []data.PRInfo{
+			{Number: 42, Title: "Fix bug", Author: data.PRAuthor{Login: "alice"}},
+		},
+	}
+
+	_, cmd := m.Update(msg)
+	if cmd == nil {
+		t.Error("should schedule next PR poll")
+	}
+}
+
 func TestConvoyUpdateForwarding(t *testing.T) {
 	m := testModel()
 	m = sized(m, 80, 24)
@@ -359,6 +392,14 @@ func TestConvoyTickTriggersCmd(t *testing.T) {
 	}
 }
 
+func TestPRTickTriggersCmd(t *testing.T) {
+	m := testModel()
+	_, cmd := m.Update(data.PRTickMsg(time.Now()))
+	if cmd == nil {
+		t.Error("PRTickMsg should trigger a fetch command")
+	}
+}
+
 // ---------------------------------------------------------------------------
 // View rendering
 // ---------------------------------------------------------------------------
@@ -383,6 +424,9 @@ func TestViewRendersTabBar(t *testing.T) {
 	}
 	if !containsText(v, "Agents") {
 		t.Error("View should contain Agents tab")
+	}
+	if !containsText(v, "PRs") {
+		t.Error("View should contain PRs tab")
 	}
 }
 
