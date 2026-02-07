@@ -20,6 +20,7 @@ const (
 	PaneMail
 	PaneCI
 	PaneLogs
+	PaneResources
 	PaneNewIssue
 )
 
