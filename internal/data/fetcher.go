@@ -64,6 +64,23 @@ func (f *Fetcher) runBdCmd(args ...string) (*bytes.Buffer, error) {
 	return &stdout, nil
 }
 
+// FetchRigs runs gt rig list and returns rig names.
+func (f *Fetcher) FetchRigs() ([]string, error) {
+	stdout, err := runCmd(cmdTimeout, "gt", "rig", "list")
+	if err != nil {
+		return nil, fmt.Errorf("listing rigs: %w", err)
+	}
+
+	var rigs []string
+	for _, line := range strings.Split(strings.TrimSpace(stdout.String()), "\n") {
+		name := strings.TrimSpace(line)
+		if name != "" {
+			rigs = append(rigs, name)
+		}
+	}
+	return rigs, nil
+}
+
 // FetchStatus runs gt status --json and parses agent info.
 func (f *Fetcher) FetchStatus() (*TownStatus, error) {
 	stdout, err := runCmd(cmdTimeout, "gt", "status", "--json")

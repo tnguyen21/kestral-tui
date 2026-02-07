@@ -39,6 +39,7 @@ func New(cfg config.Config) Model {
 		pane.NewDashboard(),
 		pane.NewAgentsPane(),
 		pane.NewConvoysPane(),
+		pane.NewNewIssuePane(),
 	}
 
 	return Model{
@@ -74,6 +75,7 @@ func (m Model) Init() tea.Cmd {
 		fetchStatusCmd(m.fetcher),
 		fetchAgentsCmd(m.fetcher),
 		fetchConvoysCmd(m.fetcher),
+		fetchRigsCmd(m.fetcher),
 	)
 }
 
@@ -125,6 +127,15 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		cmds = append(cmds, data.ScheduleConvoyPoll(
 			time.Duration(m.config.PollInterval.Convoys)*time.Second))
 		return m, tea.Batch(cmds...)
+
+	// Rig list and issue submission — forward to all panes.
+	case pane.RigListMsg:
+		cmds := m.forwardToAllPanes(msg)
+		return m, tea.Batch(cmds...)
+
+	case pane.IssueSubmitMsg:
+		cmds := m.forwardToAllPanes(msg)
+		return m, tea.Batch(cmds...)
 	}
 
 	return m, nil
@@ -149,9 +160,27 @@ func (m Model) View() string {
 	return lipgloss.JoinVertical(lipgloss.Left, tabBar, content, statusBar)
 }
 
+// inputPane returns true if the active pane captures keyboard input
+// (e.g., a form) and most global keys should be forwarded instead.
+func (m Model) inputPane() bool {
+	if m.activePane < len(m.panes) {
+		return m.panes[m.activePane].ID() == pane.PaneNewIssue
+	}
+	return false
+}
+
 // handleKey processes global key bindings, forwarding unhandled keys
 // to the active pane.
 func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	// When an input-capturing pane is active, only handle ctrl+c for quit.
+	// All other keys go to the pane for text input.
+	if m.inputPane() {
+		if msg.String() == "ctrl+c" {
+			return m, tea.Quit
+		}
+		return m.updateActivePane(msg)
+	}
+
 	switch {
 	case key.Matches(msg, m.keys.Quit):
 		return m, tea.Quit
@@ -360,6 +389,14 @@ func fetchAgentsCmd(f *data.Fetcher) tea.Cmd {
 			}
 		}
 		return pane.AgentUpdateMsg{Agents: agents, Err: err}
+	}
+}
+
+// fetchRigsCmd fetches available rig names and returns a pane.RigListMsg.
+func fetchRigsCmd(f *data.Fetcher) tea.Cmd {
+	return func() tea.Msg {
+		rigs, err := f.FetchRigs()
+		return pane.RigListMsg{Rigs: rigs, Err: err}
 	}
 }
 
