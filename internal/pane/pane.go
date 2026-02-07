@@ -15,6 +15,7 @@ const (
 	PaneDashboard PaneID = iota
 	PaneAgents
 	PaneRefinery
+	PanePRs
 	PaneConvoys
 	PaneMayor
 	PaneMail

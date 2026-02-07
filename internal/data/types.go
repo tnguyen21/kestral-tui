@@ -35,6 +35,35 @@ type IssueDetail struct {
 	UpdatedAt string `json:"updated_at"`
 }
 
+// PRStatusCheck represents a single CI status check on a PR.
+type PRStatusCheck struct {
+	Name       string `json:"name"`
+	Status     string `json:"status"`     // COMPLETED, IN_PROGRESS, QUEUED, etc.
+	Conclusion string `json:"conclusion"` // SUCCESS, FAILURE, NEUTRAL, etc.
+}
+
+// PRInfo represents a GitHub pull request from gh pr list --json.
+type PRInfo struct {
+	Number         int             `json:"number"`
+	Title          string          `json:"title"`
+	Author         PRAuthor        `json:"author"`
+	HeadRefName    string          `json:"headRefName"`
+	CreatedAt      string          `json:"createdAt"`
+	IsDraft        bool            `json:"isDraft"`
+	ReviewDecision string          `json:"reviewDecision"` // APPROVED, CHANGES_REQUESTED, REVIEW_REQUIRED, ""
+	Mergeable      string          `json:"mergeable"`      // MERGEABLE, CONFLICTING, UNKNOWN
+	Additions      int             `json:"additions"`
+	Deletions      int             `json:"deletions"`
+	ChangedFiles   int             `json:"changedFiles"`
+	URL            string          `json:"url"`
+	StatusChecks   []PRStatusCheck `json:"statusCheckRollup"`
+}
+
+// PRAuthor represents a PR author.
+type PRAuthor struct {
+	Login string `json:"login"`
+}
+
 // SessionInfo represents a parsed tmux session.
 type SessionInfo struct {
 	Name     string

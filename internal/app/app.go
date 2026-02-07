@@ -40,6 +40,7 @@ func New(cfg config.Config) Model {
 		pane.NewDashboard(),
 		pane.NewAgentsPane(),
 		pane.NewRefineryPane(),
+		pane.NewPRsPane(),
 		pane.NewConvoysPane(),
 		pane.NewResourcesPane(),
 		pane.NewNewIssuePane(),
@@ -85,6 +86,7 @@ func (m Model) Init() tea.Cmd {
 		fetchRefineryCmd(m.fetcher),
 		fetchResourcesCmd(m.fetcher),
 		fetchWitnessesCmd(m.fetcher),
+		fetchPRsCmd(m.fetcher),
 	)
 }
 
@@ -124,6 +126,8 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, fetchResourcesCmd(m.fetcher)
 	case data.WitnessTickMsg:
 		return m, fetchWitnessesCmd(m.fetcher)
+	case data.PRTickMsg:
+		return m, fetchPRsCmd(m.fetcher)
 
 	// Data update messages — forward to all panes and schedule next poll.
 	case pane.StatusUpdateMsg:
@@ -200,6 +204,12 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		cmds = append(cmds, data.ScheduleWitnessPoll(
 			time.Duration(m.config.PollInterval.Witnesses)*time.Second))
 		return m, tea.Batch(cmds...)
+
+	case pane.PRUpdateMsg:
+		cmds := m.forwardToAllPanes(msg)
+		cmds = append(cmds, data.SchedulePRPoll(
+			time.Duration(m.config.PollInterval.PRs)*time.Second))
+		return m, tea.Batch(cmds...)
 	}
 
 	return m, nil
@@ -270,6 +280,7 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			fetchRefineryCmd(m.fetcher),
 			fetchResourcesCmd(m.fetcher),
 			fetchWitnessesCmd(m.fetcher),
+			fetchPRsCmd(m.fetcher),
 		)
 	}
 
@@ -582,5 +593,13 @@ func fetchWitnessesCmd(f *data.Fetcher) tea.Cmd {
 			}
 		}
 		return pane.WitnessUpdateMsg{Witnesses: witnesses, Err: err}
+	}
+}
+
+// fetchPRsCmd fetches open PRs and returns a pane.PRUpdateMsg.
+func fetchPRsCmd(f *data.Fetcher) tea.Cmd {
+	return func() tea.Msg {
+		prs, err := f.FetchPullRequests()
+		return pane.PRUpdateMsg{PRs: prs, Err: err}
 	}
 }

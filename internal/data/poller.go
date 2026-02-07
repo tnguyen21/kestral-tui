@@ -14,6 +14,7 @@ type MailTickMsg time.Time
 type RefineryTickMsg time.Time
 type ResourceTickMsg time.Time
 type WitnessTickMsg time.Time
+type PRTickMsg time.Time
 
 // Result messages carry fetched data back to the model.
 type StatusUpdateMsg struct {
@@ -126,4 +127,25 @@ func ScheduleWitnessPoll(interval time.Duration) tea.Cmd {
 	return tea.Tick(interval, func(t time.Time) tea.Msg {
 		return WitnessTickMsg(t)
 	})
+}
+
+// SchedulePRPoll returns a tea.Tick command for the next PR poll.
+func SchedulePRPoll(interval time.Duration) tea.Cmd {
+	return tea.Tick(interval, func(t time.Time) tea.Msg {
+		return PRTickMsg(t)
+	})
+}
+
+// PRUpdateMsg carries fetched PR data back to the model.
+type PRUpdateMsg struct {
+	PRs []PRInfo
+	Err error
+}
+
+// FetchPRsCmd returns a tea.Cmd that fetches PRs in the background.
+func FetchPRsCmd(fetcher *Fetcher) tea.Cmd {
+	return func() tea.Msg {
+		prs, err := fetcher.FetchPullRequests()
+		return PRUpdateMsg{PRs: prs, Err: err}
+	}
 }

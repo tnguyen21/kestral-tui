@@ -533,6 +533,24 @@ func (f *Fetcher) FetchResources() ([]SessionResource, error) {
 	return results, nil
 }
 
+// FetchPullRequests runs gh pr list --json for each rig discovered via git remotes
+// and returns aggregated PR info.
+func (f *Fetcher) FetchPullRequests() ([]PRInfo, error) {
+	stdout, err := runCmd(ghCmdTimeout, "gh", "pr", "list",
+		"--json", "number,title,author,headRefName,createdAt,isDraft,reviewDecision,mergeable,additions,deletions,changedFiles,url,statusCheckRollup",
+		"--limit", "50",
+	)
+	if err != nil {
+		return nil, fmt.Errorf("listing PRs: %w", err)
+	}
+
+	var prs []PRInfo
+	if err := json.Unmarshal(stdout.Bytes(), &prs); err != nil {
+		return nil, fmt.Errorf("parsing PR list: %w", err)
+	}
+	return prs, nil
+}
+
 // FetchConvoys runs bd list --type=convoy --status=open --json in TownRoot.
 func (f *Fetcher) FetchConvoys() ([]ConvoyInfo, error) {
 	stdout, err := f.runBdCmd("list", "--type=convoy", "--status=open", "--json")
