@@ -29,8 +29,8 @@ func sized(m Model, w, h int) Model {
 func TestNew(t *testing.T) {
 	m := testModel()
 
-	if len(m.panes) != 7 {
-		t.Fatalf("expected 7 panes, got %d", len(m.panes))
+	if len(m.panes) != 8 {
+		t.Fatalf("expected 8 panes, got %d", len(m.panes))
 	}
 	if m.panes[0].ID() != pane.PaneDashboard {
 		t.Errorf("pane 0 should be Dashboard, got %d", m.panes[0].ID())
@@ -52,6 +52,9 @@ func TestNew(t *testing.T) {
 	}
 	if m.panes[6].ID() != pane.PaneMail {
 		t.Errorf("pane 6 should be Mail, got %d", m.panes[6].ID())
+	}
+	if m.panes[7].ID() != pane.PaneWitness {
+		t.Errorf("pane 7 should be Witness, got %d", m.panes[7].ID())
 	}
 	if m.activePane != 0 {
 		t.Errorf("activePane should start at 0, got %d", m.activePane)
@@ -168,11 +171,11 @@ func TestShiftTabKey(t *testing.T) {
 	m := testModel()
 	m = sized(m, 80, 24)
 
-	// Shift+tab wraps backward: 0 -> 6 (last pane)
+	// Shift+tab wraps backward: 0 -> 7 (last pane)
 	newM, _ := m.Update(tea.KeyMsg{Type: tea.KeyShiftTab})
 	m = newM.(Model)
-	if m.activePane != 6 {
-		t.Errorf("shift+tab from 0: activePane = %d, want 6", m.activePane)
+	if m.activePane != 7 {
+		t.Errorf("shift+tab from 0: activePane = %d, want 7", m.activePane)
 	}
 }
 
@@ -480,6 +483,30 @@ func TestResourceUpdateForwarding(t *testing.T) {
 	_, cmd := m.Update(msg)
 	if cmd == nil {
 		t.Error("should schedule next resource poll")
+	}
+}
+
+func TestWitnessTickTriggersCmd(t *testing.T) {
+	m := testModel()
+	_, cmd := m.Update(data.WitnessTickMsg(time.Now()))
+	if cmd == nil {
+		t.Error("WitnessTickMsg should trigger a fetch command")
+	}
+}
+
+func TestWitnessUpdateForwarding(t *testing.T) {
+	m := testModel()
+	m = sized(m, 80, 24)
+
+	msg := pane.WitnessUpdateMsg{
+		Witnesses: []pane.WitnessInfo{
+			{Rig: "gastown", Status: "alive", HasSession: true},
+		},
+	}
+
+	_, cmd := m.Update(msg)
+	if cmd == nil {
+		t.Error("should schedule next witness poll")
 	}
 }
 

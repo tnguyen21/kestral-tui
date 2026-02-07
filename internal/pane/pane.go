@@ -22,6 +22,7 @@ const (
 	PaneLogs
 	PaneResources
 	PaneNewIssue
+	PaneWitness
 )
 
 // Pane is the interface that all TUI panes implement.

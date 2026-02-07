@@ -21,6 +21,9 @@ func TestDefault(t *testing.T) {
 	if cfg.PollInterval.Convoys != 15 {
 		t.Errorf("expected convoys interval 15, got %d", cfg.PollInterval.Convoys)
 	}
+	if cfg.PollInterval.Witnesses != 10 {
+		t.Errorf("expected witnesses interval 10, got %d", cfg.PollInterval.Witnesses)
+	}
 }
 
 func TestLoadMissingFile(t *testing.T) {

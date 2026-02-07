@@ -105,3 +105,13 @@ type CommitInfo struct {
 	Hash    string
 	Message string
 }
+
+// WitnessDetail holds witness heartbeat info for the TUI witness pane.
+type WitnessDetail struct {
+	Rig            string `json:"rig"`
+	LastHeartbeat  int64  `json:"last_heartbeat"`  // unix timestamp of last activity
+	Status         string `json:"status"`           // alive, stale, dead
+	PolecatCount   int    `json:"polecat_count"`
+	SessionCreated int64  `json:"session_created"` // unix timestamp of session creation
+	HasSession     bool   `json:"has_session"`
+}

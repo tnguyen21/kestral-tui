@@ -13,6 +13,7 @@ type ConvoyTickMsg time.Time
 type MailTickMsg time.Time
 type RefineryTickMsg time.Time
 type ResourceTickMsg time.Time
+type WitnessTickMsg time.Time
 
 // Result messages carry fetched data back to the model.
 type StatusUpdateMsg struct {
@@ -117,5 +118,12 @@ func ScheduleAgentDetailPoll(interval time.Duration) tea.Cmd {
 func ScheduleResourcePoll(interval time.Duration) tea.Cmd {
 	return tea.Tick(interval, func(t time.Time) tea.Msg {
 		return ResourceTickMsg(t)
+	})
+}
+
+// ScheduleWitnessPoll returns a tea.Tick command for the next witness poll.
+func ScheduleWitnessPoll(interval time.Duration) tea.Cmd {
+	return tea.Tick(interval, func(t time.Time) tea.Msg {
+		return WitnessTickMsg(t)
 	})
 }

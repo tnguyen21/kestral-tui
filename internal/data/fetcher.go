@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"os/exec"
 	"path/filepath"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -629,4 +630,99 @@ func (f *Fetcher) FetchAgentOutput(rig, name string, lines int) string {
 		return ""
 	}
 	return stdout.String()
+}
+
+// FetchWitnesses detects witness sessions from tmux, computes heartbeat
+// status, and counts managed polecats per rig.
+func (f *Fetcher) FetchWitnesses() ([]WitnessDetail, error) {
+	stdout, err := runCmd(tmuxCmdTimeout, "tmux", "list-sessions", "-F",
+		"#{session_name}|#{window_activity}|#{session_created}")
+	if err != nil {
+		return nil, fmt.Errorf("listing tmux sessions: %w", err)
+	}
+
+	type sessionExt struct {
+		Name     string
+		Activity int64
+		Created  int64
+	}
+
+	var sessions []sessionExt
+	for _, line := range strings.Split(strings.TrimSpace(stdout.String()), "\n") {
+		if line == "" {
+			continue
+		}
+		parts := strings.SplitN(line, "|", 3)
+		if len(parts) < 3 {
+			continue
+		}
+		s := sessionExt{Name: parts[0]}
+		fmt.Sscanf(parts[1], "%d", &s.Activity)
+		fmt.Sscanf(parts[2], "%d", &s.Created)
+		sessions = append(sessions, s)
+	}
+
+	now := time.Now()
+
+	// Track all rigs and their polecats
+	allRigs := make(map[string]bool)
+	polecatCounts := make(map[string]int)
+	witnessSessions := make(map[string]sessionExt)
+
+	for _, s := range sessions {
+		if !strings.HasPrefix(s.Name, "gt-") {
+			continue
+		}
+		parts := strings.SplitN(s.Name, "-", 3)
+		if len(parts) != 3 {
+			continue
+		}
+		rig := parts[1]
+		name := parts[2]
+		allRigs[rig] = true
+
+		if name == "witness" {
+			witnessSessions[rig] = s
+		} else if name != "refinery" && name != "mayor" {
+			polecatCounts[rig]++
+		}
+	}
+
+	var witnesses []WitnessDetail
+	for rig := range allRigs {
+		wd := WitnessDetail{
+			Rig:          rig,
+			PolecatCount: polecatCounts[rig],
+		}
+
+		if ws, ok := witnessSessions[rig]; ok {
+			wd.HasSession = true
+			wd.LastHeartbeat = ws.Activity
+			wd.SessionCreated = ws.Created
+
+			if ws.Activity > 0 {
+				age := now.Sub(time.Unix(ws.Activity, 0))
+				switch {
+				case age < 5*time.Minute:
+					wd.Status = "alive"
+				case age < 15*time.Minute:
+					wd.Status = "stale"
+				default:
+					wd.Status = "dead"
+				}
+			} else {
+				wd.Status = "dead"
+			}
+		} else {
+			wd.Status = "dead"
+		}
+
+		witnesses = append(witnesses, wd)
+	}
+
+	sort.Slice(witnesses, func(i, j int) bool {
+		return witnesses[i].Rig < witnesses[j].Rig
+	})
+
+	return witnesses, nil
 }
