@@ -39,6 +39,7 @@ func New(cfg config.Config) Model {
 		pane.NewDashboard(),
 		pane.NewAgentsPane(),
 		pane.NewConvoysPane(),
+		pane.NewMailPane(),
 	}
 
 	return Model{
@@ -74,6 +75,7 @@ func (m Model) Init() tea.Cmd {
 		fetchStatusCmd(m.fetcher),
 		fetchAgentsCmd(m.fetcher),
 		fetchConvoysCmd(m.fetcher),
+		fetchMailCmd(m.fetcher),
 	)
 }
 
@@ -105,6 +107,8 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, fetchAgentsCmd(m.fetcher)
 	case data.ConvoyTickMsg:
 		return m, fetchConvoysCmd(m.fetcher)
+	case data.MailTickMsg:
+		return m, fetchMailCmd(m.fetcher)
 
 	// Data update messages — forward to all panes and schedule next poll.
 	case pane.StatusUpdateMsg:
@@ -124,6 +128,12 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		cmds := m.forwardToAllPanes(msg)
 		cmds = append(cmds, data.ScheduleConvoyPoll(
 			time.Duration(m.config.PollInterval.Convoys)*time.Second))
+		return m, tea.Batch(cmds...)
+
+	case pane.MailUpdateMsg:
+		cmds := m.forwardToAllPanes(msg)
+		cmds = append(cmds, data.ScheduleMailPoll(
+			time.Duration(m.config.PollInterval.Mail)*time.Second))
 		return m, tea.Batch(cmds...)
 	}
 
@@ -173,6 +183,7 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			fetchStatusCmd(m.fetcher),
 			fetchAgentsCmd(m.fetcher),
 			fetchConvoysCmd(m.fetcher),
+			fetchMailCmd(m.fetcher),
 		)
 	}
 
@@ -360,6 +371,30 @@ func fetchAgentsCmd(f *data.Fetcher) tea.Cmd {
 			}
 		}
 		return pane.AgentUpdateMsg{Agents: agents, Err: err}
+	}
+}
+
+// fetchMailCmd fetches mail messages and returns a pane.MailUpdateMsg.
+func fetchMailCmd(f *data.Fetcher) tea.Cmd {
+	return func() tea.Msg {
+		messages, err := f.FetchMail()
+		infos := make([]pane.MailInfo, len(messages))
+		for i, m := range messages {
+			ts, _ := time.Parse(time.RFC3339Nano, m.Timestamp)
+			infos[i] = pane.MailInfo{
+				ID:        m.ID,
+				From:      m.From,
+				To:        m.To,
+				Subject:   m.Subject,
+				Body:      m.Body,
+				Timestamp: ts,
+				Read:      m.Read,
+				Priority:  m.Priority,
+				Type:      m.Type,
+				ThreadID:  m.ThreadID,
+			}
+		}
+		return pane.MailUpdateMsg{Messages: infos, Err: err}
 	}
 }
 

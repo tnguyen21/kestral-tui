@@ -201,6 +201,25 @@ func (f *Fetcher) fetchAssignedIssues() map[string]IssueDetail {
 	return result
 }
 
+// FetchMail runs gt mail inbox --all --json and parses the result.
+func (f *Fetcher) FetchMail() ([]MailMessage, error) {
+	stdout, err := runCmd(cmdTimeout, "gt", "mail", "inbox", "--all", "--json")
+	if err != nil {
+		return nil, fmt.Errorf("fetching mail: %w", err)
+	}
+
+	raw := strings.TrimSpace(stdout.String())
+	if raw == "" || raw == "null" {
+		return nil, nil
+	}
+
+	var messages []MailMessage
+	if err := json.Unmarshal([]byte(raw), &messages); err != nil {
+		return nil, fmt.Errorf("parsing mail: %w", err)
+	}
+	return messages, nil
+}
+
 // FetchConvoys runs bd list --type=convoy --status=open --json in TownRoot.
 func (f *Fetcher) FetchConvoys() ([]ConvoyInfo, error) {
 	stdout, err := f.runBdCmd("list", "--type=convoy", "--status=open", "--json")

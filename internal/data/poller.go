@@ -10,6 +10,7 @@ import (
 type StatusTickMsg time.Time
 type AgentTickMsg time.Time
 type ConvoyTickMsg time.Time
+type MailTickMsg time.Time
 
 // Result messages carry fetched data back to the model.
 type StatusUpdateMsg struct {
@@ -70,4 +71,25 @@ func FetchConvoysCmd(fetcher *Fetcher) tea.Cmd {
 		convoys, err := fetcher.FetchConvoys()
 		return ConvoyUpdateMsg{Convoys: convoys, Err: err}
 	}
+}
+
+// ScheduleMailPoll returns a tea.Tick command for the next mail poll.
+func ScheduleMailPoll(interval time.Duration) tea.Cmd {
+	return tea.Tick(interval, func(t time.Time) tea.Msg {
+		return MailTickMsg(t)
+	})
+}
+
+// FetchMailCmd returns a tea.Cmd that fetches mail in the background.
+func FetchMailCmd(fetcher *Fetcher) tea.Cmd {
+	return func() tea.Msg {
+		messages, err := fetcher.FetchMail()
+		return MailUpdateMsg{Messages: messages, Err: err}
+	}
+}
+
+// MailUpdateMsg carries fetched mail data back to the model.
+type MailUpdateMsg struct {
+	Messages []MailMessage
+	Err      error
 }
