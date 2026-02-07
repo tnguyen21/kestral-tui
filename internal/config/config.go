@@ -14,6 +14,7 @@ type PollInterval struct {
 	Status  int `yaml:"status"`
 	Agents  int `yaml:"agents"`
 	Convoys int `yaml:"convoys"`
+	Mail    int `yaml:"mail"`
 }
 
 type Config struct {
@@ -33,6 +34,7 @@ func Default() Config {
 			Status:  10,
 			Agents:  5,
 			Convoys: 15,
+			Mail:    10,
 		},
 	}
 }
@@ -87,6 +89,9 @@ func validate(cfg Config) error {
 	}
 	if cfg.PollInterval.Convoys < 1 {
 		return fmt.Errorf("poll_interval.convoys must be >= 1")
+	}
+	if cfg.PollInterval.Mail < 1 {
+		return fmt.Errorf("poll_interval.mail must be >= 1")
 	}
 
 	return nil

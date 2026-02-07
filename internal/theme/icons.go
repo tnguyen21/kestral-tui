@@ -8,6 +8,12 @@ var (
 	IconIdle    = MutedStyle.Render("○")
 )
 
+// Mail status icons.
+var (
+	IconUnread = AccentStyle.Render("●")
+	IconRead   = MutedStyle.Render("○")
+)
+
 // Role icons for agent types.
 const (
 	RoleMayor    = "👑"

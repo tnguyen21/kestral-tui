@@ -51,3 +51,17 @@ type AgentDetail struct {
 	IssueID    string `json:"issue_id"`
 	IssueTitle string `json:"issue_title"`
 }
+
+// MailMessage represents a single mail message from gt mail inbox --json.
+type MailMessage struct {
+	ID        string `json:"id"`
+	From      string `json:"from"`
+	To        string `json:"to"`
+	Subject   string `json:"subject"`
+	Body      string `json:"body"`
+	Timestamp string `json:"timestamp"`
+	Read      bool   `json:"read"`
+	Priority  string `json:"priority"`
+	Type      string `json:"type"`
+	ThreadID  string `json:"thread_id"`
+}

@@ -29,8 +29,8 @@ func sized(m Model, w, h int) Model {
 func TestNew(t *testing.T) {
 	m := testModel()
 
-	if len(m.panes) != 4 {
-		t.Fatalf("expected 4 panes, got %d", len(m.panes))
+	if len(m.panes) != 5 {
+		t.Fatalf("expected 5 panes, got %d", len(m.panes))
 	}
 	if m.panes[0].ID() != pane.PaneDashboard {
 		t.Errorf("pane 0 should be Dashboard, got %d", m.panes[0].ID())
@@ -43,6 +43,9 @@ func TestNew(t *testing.T) {
 	}
 	if m.panes[3].ID() != pane.PaneNewIssue {
 		t.Errorf("pane 3 should be NewIssue, got %d", m.panes[3].ID())
+	}
+	if m.panes[4].ID() != pane.PaneMail {
+		t.Errorf("pane 4 should be Mail, got %d", m.panes[4].ID())
 	}
 	if m.activePane != 0 {
 		t.Errorf("activePane should start at 0, got %d", m.activePane)
@@ -145,11 +148,11 @@ func TestShiftTabKey(t *testing.T) {
 	m := testModel()
 	m = sized(m, 80, 24)
 
-	// Shift+tab wraps backward: 0 -> 3 (last pane)
+	// Shift+tab wraps backward: 0 -> 4 (last pane)
 	newM, _ := m.Update(tea.KeyMsg{Type: tea.KeyShiftTab})
 	m = newM.(Model)
-	if m.activePane != 3 {
-		t.Errorf("shift+tab from 0: activePane = %d, want 3", m.activePane)
+	if m.activePane != 4 {
+		t.Errorf("shift+tab from 0: activePane = %d, want 4", m.activePane)
 	}
 }
 
@@ -188,11 +191,18 @@ func TestNumberKeys(t *testing.T) {
 	// Go back to a non-input pane (since pane 3 captures keys)
 	m.activePane = 0
 
-	// Press "5" - no pane 5 exists, should stay
+	// Press "5" to go to mail pane
 	newM, _ = m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'5'}})
 	m = newM.(Model)
-	if m.activePane != 0 {
-		t.Errorf("after '5' (nonexistent): activePane = %d, want 0", m.activePane)
+	if m.activePane != 4 {
+		t.Errorf("after '5': activePane = %d, want 4", m.activePane)
+	}
+
+	// Press "6" - no pane 6 exists, should stay
+	newM, _ = m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'6'}})
+	m = newM.(Model)
+	if m.activePane != 4 {
+		t.Errorf("after '6' (nonexistent): activePane = %d, want 4", m.activePane)
 	}
 }
 
