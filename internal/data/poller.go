@@ -101,3 +101,13 @@ func ScheduleRefineryPoll(interval time.Duration) tea.Cmd {
 		return RefineryTickMsg(t)
 	})
 }
+
+// AgentDetailTickMsg triggers a periodic fetch for agent detail data.
+type AgentDetailTickMsg time.Time
+
+// ScheduleAgentDetailPoll returns a tea.Tick command for the next agent detail poll.
+func ScheduleAgentDetailPoll(interval time.Duration) tea.Cmd {
+	return tea.Tick(interval, func(t time.Time) tea.Msg {
+		return AgentDetailTickMsg(t)
+	})
+}

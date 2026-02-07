@@ -89,3 +89,9 @@ type MailMessage struct {
 	Type      string `json:"type"`
 	ThreadID  string `json:"thread_id"`
 }
+
+// CommitInfo represents a single git commit (short hash + message).
+type CommitInfo struct {
+	Hash    string
+	Message string
+}

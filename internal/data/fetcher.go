@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os/exec"
+	"path/filepath"
 	"strings"
 	"time"
 )
@@ -421,4 +422,49 @@ func (f *Fetcher) FetchTrackedIssues(convoyID string) ([]IssueDetail, error) {
 		return nil, fmt.Errorf("parsing issue details: %w", err)
 	}
 	return issues, nil
+}
+
+// FetchAgentBranch returns the current git branch for a polecat's worktree.
+func (f *Fetcher) FetchAgentBranch(rig, name string) string {
+	worktree := filepath.Join(f.TownRoot, rig, "polecats", name)
+	stdout, err := runCmd(cmdTimeout, "git", "-C", worktree, "branch", "--show-current")
+	if err != nil {
+		return ""
+	}
+	return strings.TrimSpace(stdout.String())
+}
+
+// FetchAgentCommits returns the last N commits from a polecat's worktree.
+func (f *Fetcher) FetchAgentCommits(rig, name string, count int) []CommitInfo {
+	worktree := filepath.Join(f.TownRoot, rig, "polecats", name)
+	stdout, err := runCmd(cmdTimeout, "git", "-C", worktree, "log",
+		"--oneline", fmt.Sprintf("-n%d", count))
+	if err != nil {
+		return nil
+	}
+
+	var commits []CommitInfo
+	for _, line := range strings.Split(strings.TrimSpace(stdout.String()), "\n") {
+		if line == "" {
+			continue
+		}
+		parts := strings.SplitN(line, " ", 2)
+		c := CommitInfo{Hash: parts[0]}
+		if len(parts) > 1 {
+			c.Message = parts[1]
+		}
+		commits = append(commits, c)
+	}
+	return commits
+}
+
+// FetchAgentOutput captures recent tmux pane output for an agent session.
+func (f *Fetcher) FetchAgentOutput(rig, name string, lines int) string {
+	sessionName := fmt.Sprintf("gt-%s-%s", rig, name)
+	stdout, err := runCmd(tmuxCmdTimeout, "tmux", "capture-pane",
+		"-t", sessionName, "-p", fmt.Sprintf("-S-%d", lines))
+	if err != nil {
+		return ""
+	}
+	return stdout.String()
 }
