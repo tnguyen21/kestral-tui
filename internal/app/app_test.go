@@ -29,8 +29,8 @@ func sized(m Model, w, h int) Model {
 func TestNew(t *testing.T) {
 	m := testModel()
 
-	if len(m.panes) != 5 {
-		t.Fatalf("expected 5 panes, got %d", len(m.panes))
+	if len(m.panes) != 6 {
+		t.Fatalf("expected 6 panes, got %d", len(m.panes))
 	}
 	if m.panes[0].ID() != pane.PaneDashboard {
 		t.Errorf("pane 0 should be Dashboard, got %d", m.panes[0].ID())
@@ -41,11 +41,14 @@ func TestNew(t *testing.T) {
 	if m.panes[2].ID() != pane.PaneConvoys {
 		t.Errorf("pane 2 should be Convoys, got %d", m.panes[2].ID())
 	}
-	if m.panes[3].ID() != pane.PaneNewIssue {
-		t.Errorf("pane 3 should be NewIssue, got %d", m.panes[3].ID())
+	if m.panes[3].ID() != pane.PaneResources {
+		t.Errorf("pane 3 should be Resources, got %d", m.panes[3].ID())
 	}
-	if m.panes[4].ID() != pane.PaneMail {
-		t.Errorf("pane 4 should be Mail, got %d", m.panes[4].ID())
+	if m.panes[4].ID() != pane.PaneNewIssue {
+		t.Errorf("pane 4 should be NewIssue, got %d", m.panes[4].ID())
+	}
+	if m.panes[5].ID() != pane.PaneMail {
+		t.Errorf("pane 5 should be Mail, got %d", m.panes[5].ID())
 	}
 	if m.activePane != 0 {
 		t.Errorf("activePane should start at 0, got %d", m.activePane)
@@ -127,20 +130,27 @@ func TestTabKey(t *testing.T) {
 		t.Errorf("after 2nd tab: activePane = %d, want 2", m.activePane)
 	}
 
-	// Tab forward: 2 -> 3 (NewIssue)
+	// Tab forward: 2 -> 3 (Resources)
 	newM, _ = m.Update(tea.KeyMsg{Type: tea.KeyTab})
 	m = newM.(Model)
 	if m.activePane != 3 {
 		t.Errorf("after 3rd tab: activePane = %d, want 3", m.activePane)
 	}
 
-	// From pane 3 (NewIssue/input pane), tab is captured by the pane.
-	// Verify wrap from a non-input pane.
-	m.activePane = 2
+	// Tab forward: 3 -> 4 (NewIssue)
 	newM, _ = m.Update(tea.KeyMsg{Type: tea.KeyTab})
 	m = newM.(Model)
-	if m.activePane != 3 {
-		t.Errorf("tab from 2: activePane = %d, want 3", m.activePane)
+	if m.activePane != 4 {
+		t.Errorf("after 4th tab: activePane = %d, want 4", m.activePane)
+	}
+
+	// From pane 4 (NewIssue/input pane), tab is captured by the pane.
+	// Verify wrap from a non-input pane.
+	m.activePane = 3
+	newM, _ = m.Update(tea.KeyMsg{Type: tea.KeyTab})
+	m = newM.(Model)
+	if m.activePane != 4 {
+		t.Errorf("tab from 3: activePane = %d, want 4", m.activePane)
 	}
 }
 
@@ -148,11 +158,11 @@ func TestShiftTabKey(t *testing.T) {
 	m := testModel()
 	m = sized(m, 80, 24)
 
-	// Shift+tab wraps backward: 0 -> 4 (last pane)
+	// Shift+tab wraps backward: 0 -> 5 (last pane)
 	newM, _ := m.Update(tea.KeyMsg{Type: tea.KeyShiftTab})
 	m = newM.(Model)
-	if m.activePane != 4 {
-		t.Errorf("shift+tab from 0: activePane = %d, want 4", m.activePane)
+	if m.activePane != 5 {
+		t.Errorf("shift+tab from 0: activePane = %d, want 5", m.activePane)
 	}
 }
 
@@ -181,28 +191,35 @@ func TestNumberKeys(t *testing.T) {
 		t.Errorf("after '3': activePane = %d, want 2", m.activePane)
 	}
 
-	// Press "4" to go to new issue pane
+	// Press "4" to go to resources pane
 	newM, _ = m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'4'}})
 	m = newM.(Model)
 	if m.activePane != 3 {
 		t.Errorf("after '4': activePane = %d, want 3", m.activePane)
 	}
 
-	// Go back to a non-input pane (since pane 3 captures keys)
-	m.activePane = 0
-
-	// Press "5" to go to mail pane
+	// Press "5" to go to new issue pane
 	newM, _ = m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'5'}})
 	m = newM.(Model)
 	if m.activePane != 4 {
 		t.Errorf("after '5': activePane = %d, want 4", m.activePane)
 	}
 
-	// Press "6" - no pane 6 exists, should stay
+	// Go back to a non-input pane (since pane 4 captures keys)
+	m.activePane = 0
+
+	// Press "6" to go to mail pane
 	newM, _ = m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'6'}})
 	m = newM.(Model)
-	if m.activePane != 4 {
-		t.Errorf("after '6' (nonexistent): activePane = %d, want 4", m.activePane)
+	if m.activePane != 5 {
+		t.Errorf("after '6': activePane = %d, want 5", m.activePane)
+	}
+
+	// Press "7" - no pane 7 exists, should stay
+	newM, _ = m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'7'}})
+	m = newM.(Model)
+	if m.activePane != 5 {
+		t.Errorf("after '7' (nonexistent): activePane = %d, want 5", m.activePane)
 	}
 }
 
@@ -405,6 +422,30 @@ func TestConvoyTickTriggersCmd(t *testing.T) {
 	_, cmd := m.Update(data.ConvoyTickMsg(time.Now()))
 	if cmd == nil {
 		t.Error("ConvoyTickMsg should trigger a fetch command")
+	}
+}
+
+func TestResourceTickTriggersCmd(t *testing.T) {
+	m := testModel()
+	_, cmd := m.Update(data.ResourceTickMsg(time.Now()))
+	if cmd == nil {
+		t.Error("ResourceTickMsg should trigger a fetch command")
+	}
+}
+
+func TestResourceUpdateForwarding(t *testing.T) {
+	m := testModel()
+	m = sized(m, 120, 24)
+
+	msg := pane.ResourceUpdateMsg{
+		Sessions: []data.SessionResource{
+			{Name: "gt-kestral-witness", CPUPercent: 12.5, MemRSS: 50 << 20},
+		},
+	}
+
+	_, cmd := m.Update(msg)
+	if cmd == nil {
+		t.Error("should schedule next resource poll")
 	}
 }
 

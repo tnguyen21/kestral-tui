@@ -39,6 +39,7 @@ func New(cfg config.Config) Model {
 		pane.NewDashboard(),
 		pane.NewAgentsPane(),
 		pane.NewConvoysPane(),
+		pane.NewResourcesPane(),
 		pane.NewNewIssuePane(),
 		pane.NewMailPane(),
 	}
@@ -78,6 +79,7 @@ func (m Model) Init() tea.Cmd {
 		fetchConvoysCmd(m.fetcher),
 		fetchRigsCmd(m.fetcher),
 		fetchMailCmd(m.fetcher),
+		fetchResourcesCmd(m.fetcher),
 	)
 }
 
@@ -111,6 +113,8 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, fetchConvoysCmd(m.fetcher)
 	case data.MailTickMsg:
 		return m, fetchMailCmd(m.fetcher)
+	case data.ResourceTickMsg:
+		return m, fetchResourcesCmd(m.fetcher)
 
 	// Data update messages — forward to all panes and schedule next poll.
 	case pane.StatusUpdateMsg:
@@ -145,6 +149,12 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		cmds := m.forwardToAllPanes(msg)
 		cmds = append(cmds, data.ScheduleMailPoll(
 			time.Duration(m.config.PollInterval.Mail)*time.Second))
+		return m, tea.Batch(cmds...)
+
+	case pane.ResourceUpdateMsg:
+		cmds := m.forwardToAllPanes(msg)
+		cmds = append(cmds, data.ScheduleResourcePoll(
+			time.Duration(m.config.PollInterval.Resources)*time.Second))
 		return m, tea.Batch(cmds...)
 	}
 
@@ -213,6 +223,7 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			fetchAgentsCmd(m.fetcher),
 			fetchConvoysCmd(m.fetcher),
 			fetchMailCmd(m.fetcher),
+			fetchResourcesCmd(m.fetcher),
 		)
 	}
 
@@ -432,6 +443,17 @@ func fetchMailCmd(f *data.Fetcher) tea.Cmd {
 			}
 		}
 		return pane.MailUpdateMsg{Messages: infos, Err: err}
+	}
+}
+
+// fetchResourcesCmd fetches session resource data and returns a pane.ResourceUpdateMsg.
+func fetchResourcesCmd(f *data.Fetcher) tea.Cmd {
+	return func() tea.Msg {
+		resources, err := f.FetchResources()
+		return pane.ResourceUpdateMsg{
+			Sessions: resources,
+			Err:      err,
+		}
 	}
 }
 

@@ -52,6 +52,16 @@ type AgentDetail struct {
 	IssueTitle string `json:"issue_title"`
 }
 
+// SessionResource holds aggregated resource usage for a single tmux session.
+type SessionResource struct {
+	Name         string  `json:"name"`
+	CPUPercent   float64 `json:"cpu_percent"`
+	MemRSS       int64   `json:"mem_rss"` // bytes
+	ProcessCount int     `json:"process_count"`
+	UptimeSecs   int64   `json:"uptime_secs"`
+	ActivityTS   int64   `json:"activity_ts"` // last activity unix timestamp
+}
+
 // MailMessage represents a single mail message from gt mail inbox --json.
 type MailMessage struct {
 	ID        string `json:"id"`
