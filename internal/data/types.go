@@ -51,3 +51,9 @@ type AgentDetail struct {
 	IssueID    string `json:"issue_id"`
 	IssueTitle string `json:"issue_title"`
 }
+
+// CommitInfo represents a single git commit (short hash + message).
+type CommitInfo struct {
+	Hash    string
+	Message string
+}

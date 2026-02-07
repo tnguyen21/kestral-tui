@@ -6,8 +6,10 @@ import (
 	"time"
 
 	"github.com/charmbracelet/bubbles/key"
+	"github.com/charmbracelet/bubbles/viewport"
 	tea "github.com/charmbracelet/bubbletea"
 
+	"github.com/tnguyen21/kestral-tui/internal/data"
 	"github.com/tnguyen21/kestral-tui/internal/theme"
 )
 
@@ -28,31 +30,69 @@ type AgentUpdateMsg struct {
 	Err    error
 }
 
+// AgentSelectedMsg signals that the user selected an agent for detail view.
+type AgentSelectedMsg struct {
+	Agent AgentInfo
+}
+
+// AgentDeselectedMsg signals that the user exited the detail view.
+type AgentDeselectedMsg struct{}
+
+// AgentDetailDataMsg carries fetched detail data for the selected agent.
+type AgentDetailDataMsg struct {
+	Name    string
+	Branch  string
+	Commits []data.CommitInfo
+	Output  string
+	Err     error
+}
+
+// detailViewData holds fetched data for the agent detail view.
+type detailViewData struct {
+	Branch  string
+	Commits []data.CommitInfo
+	Output  string
+}
+
 // AgentsPane displays a scrollable list of running agents with live status.
+// Supports a detail view mode triggered by selecting an agent.
 type AgentsPane struct {
-	agents   []AgentInfo
-	cursor   int
-	offset   int // viewport scroll offset
-	width    int
-	height   int
-	err      error
-	keys     agentKeys
+	agents        []AgentInfo
+	cursor        int
+	offset        int // viewport scroll offset
+	width         int
+	height        int
+	err           error
+	keys          agentKeys
+	detailMode    bool
+	selectedAgent AgentInfo
+	detailData    *detailViewData
+	detailVP      viewport.Model
 }
 
 type agentKeys struct {
-	Up   key.Binding
-	Down key.Binding
+	Up     key.Binding
+	Down   key.Binding
+	Select key.Binding
+	Back   key.Binding
 }
 
 // NewAgentsPane creates a new Agents pane.
 func NewAgentsPane() *AgentsPane {
 	return &AgentsPane{
+		detailVP: viewport.New(0, 0),
 		keys: agentKeys{
 			Up: key.NewBinding(
 				key.WithKeys("k", "up"),
 			),
 			Down: key.NewBinding(
 				key.WithKeys("j", "down"),
+			),
+			Select: key.NewBinding(
+				key.WithKeys("enter"),
+			),
+			Back: key.NewBinding(
+				key.WithKeys("esc"),
 			),
 		},
 	}
@@ -76,6 +116,11 @@ func (p *AgentsPane) Badge() int {
 func (p *AgentsPane) SetSize(w, h int) {
 	p.width = w
 	p.height = h
+	p.detailVP.Width = w
+	p.detailVP.Height = h - 1 // leave room for footer
+	if p.detailMode {
+		p.detailVP.SetContent(p.renderDetailContent())
+	}
 	p.clampScroll()
 }
 
@@ -89,29 +134,95 @@ func (p *AgentsPane) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		p.agents = msg.Agents
 		p.err = msg.Err
 		p.clampScroll()
+		// Keep selected agent data fresh while in detail mode
+		if p.detailMode {
+			for _, a := range p.agents {
+				if a.Name == p.selectedAgent.Name && a.Rig == p.selectedAgent.Rig {
+					p.selectedAgent = a
+					if p.detailData != nil {
+						p.detailVP.SetContent(p.renderDetailContent())
+					}
+					break
+				}
+			}
+		}
+
+	case AgentDetailDataMsg:
+		if p.detailMode && msg.Name == p.selectedAgent.Name {
+			p.detailData = &detailViewData{
+				Branch:  msg.Branch,
+				Commits: msg.Commits,
+				Output:  msg.Output,
+			}
+			p.detailVP.SetContent(p.renderDetailContent())
+		}
 
 	case tea.KeyMsg:
-		switch {
-		case key.Matches(msg, p.keys.Up):
-			if p.cursor > 0 {
-				p.cursor--
-				p.scrollToCursor()
-			}
-		case key.Matches(msg, p.keys.Down):
-			if p.cursor < len(p.agents)-1 {
-				p.cursor++
-				p.scrollToCursor()
+		if p.detailMode {
+			return p.updateDetail(msg)
+		}
+		return p.updateList(msg)
+	}
+	return p, nil
+}
+
+func (p *AgentsPane) updateList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	switch {
+	case key.Matches(msg, p.keys.Up):
+		if p.cursor > 0 {
+			p.cursor--
+			p.scrollToCursor()
+		}
+	case key.Matches(msg, p.keys.Down):
+		if p.cursor < len(p.agents)-1 {
+			p.cursor++
+			p.scrollToCursor()
+		}
+	case key.Matches(msg, p.keys.Select):
+		if len(p.agents) > 0 && p.cursor < len(p.agents) {
+			p.detailMode = true
+			p.selectedAgent = p.agents[p.cursor]
+			p.detailData = nil
+			p.detailVP.GotoTop()
+			p.detailVP.SetContent(p.renderDetailContent())
+			return p, func() tea.Msg {
+				return AgentSelectedMsg{Agent: p.selectedAgent}
 			}
 		}
 	}
 	return p, nil
 }
 
+func (p *AgentsPane) updateDetail(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	if key.Matches(msg, p.keys.Back) {
+		p.detailMode = false
+		p.detailData = nil
+		return p, func() tea.Msg {
+			return AgentDeselectedMsg{}
+		}
+	}
+	// Forward to viewport for scrolling
+	var cmd tea.Cmd
+	p.detailVP, cmd = p.detailVP.Update(msg)
+	return p, cmd
+}
+
 func (p *AgentsPane) View() string {
 	if p.width == 0 || p.height == 0 {
 		return ""
 	}
+	if p.detailMode {
+		return p.viewDetail()
+	}
+	return p.viewList()
+}
 
+func (p *AgentsPane) viewDetail() string {
+	footer := theme.MutedStyle.Render("esc to go back  j/k to scroll")
+	return p.detailVP.View() + "\n" + TruncateWithEllipsis(footer, p.width)
+}
+
+func (p *AgentsPane) viewList() string {
 	var b strings.Builder
 
 	// Header line
@@ -156,6 +267,94 @@ func (p *AgentsPane) View() string {
 	// Footer
 	footer := theme.MutedStyle.Render("j/k to scroll  enter for detail")
 	b.WriteString(TruncateWithEllipsis(footer, p.width))
+
+	return b.String()
+}
+
+// renderDetailContent builds the full detail view content for the viewport.
+func (p *AgentsPane) renderDetailContent() string {
+	a := p.selectedAgent
+	var b strings.Builder
+
+	// Header
+	icon := statusIcon(a.Status)
+	header := fmt.Sprintf("─── AGENT: %s ───", a.Name)
+	b.WriteString(theme.PaneHeaderStyle.Render(TruncateWithEllipsis(header, p.width)))
+	b.WriteString("\n")
+
+	// Status line
+	roleIcon := RoleIcon(a.Role)
+	statusLine := fmt.Sprintf("  %s %s  %s %s  %s", icon, a.Name, roleIcon, a.Role, FormatAge(a.Age))
+	b.WriteString(statusLine)
+	b.WriteString("\n\n")
+
+	// Hooked Issue
+	b.WriteString(theme.AccentStyle.Render("Hooked Issue"))
+	b.WriteString("\n")
+	if a.IssueID != "" {
+		maxTitle := p.width - len(a.IssueID) - 4
+		if maxTitle < 0 {
+			maxTitle = 0
+		}
+		b.WriteString(fmt.Sprintf("  %s: %s", a.IssueID, TruncateWithEllipsis(a.IssueTitle, maxTitle)))
+	} else {
+		b.WriteString(theme.MutedStyle.Render("  (none)"))
+	}
+	b.WriteString("\n\n")
+
+	if p.detailData == nil {
+		b.WriteString(theme.MutedStyle.Render("  Loading..."))
+		return b.String()
+	}
+
+	// Git Branch
+	b.WriteString(theme.AccentStyle.Render("Git Branch"))
+	b.WriteString("\n")
+	if p.detailData.Branch != "" {
+		b.WriteString("  " + p.detailData.Branch)
+	} else {
+		b.WriteString(theme.MutedStyle.Render("  (unavailable)"))
+	}
+	b.WriteString("\n\n")
+
+	// Recent Commits
+	b.WriteString(theme.AccentStyle.Render("Recent Commits"))
+	b.WriteString("\n")
+	if len(p.detailData.Commits) > 0 {
+		for _, c := range p.detailData.Commits {
+			maxMsg := p.width - 12
+			if maxMsg < 0 {
+				maxMsg = 0
+			}
+			line := fmt.Sprintf("  %s %s",
+				theme.MutedStyle.Render(c.Hash),
+				TruncateWithEllipsis(c.Message, maxMsg))
+			b.WriteString(line)
+			b.WriteString("\n")
+		}
+	} else {
+		b.WriteString(theme.MutedStyle.Render("  (no commits)"))
+		b.WriteString("\n")
+	}
+	b.WriteString("\n")
+
+	// Session Output
+	b.WriteString(theme.AccentStyle.Render("Session Output"))
+	b.WriteString("\n")
+	if p.detailData.Output != "" {
+		lines := strings.Split(strings.TrimRight(p.detailData.Output, "\n"), "\n")
+		for _, line := range lines {
+			maxLine := p.width - 2
+			if maxLine < 0 {
+				maxLine = 0
+			}
+			b.WriteString("  " + TruncateWithEllipsis(line, maxLine))
+			b.WriteString("\n")
+		}
+	} else {
+		b.WriteString(theme.MutedStyle.Render("  (no output)"))
+		b.WriteString("\n")
+	}
 
 	return b.String()
 }
@@ -329,8 +528,13 @@ func AgentStatusFromAge(age time.Duration) string {
 // Ensure AgentsPane implements Pane at compile time.
 var _ Pane = (*AgentsPane)(nil)
 
-// Ensure AgentUpdateMsg implements tea.Msg.
-var _ tea.Msg = AgentUpdateMsg{}
+// Ensure message types implement tea.Msg.
+var (
+	_ tea.Msg = AgentUpdateMsg{}
+	_ tea.Msg = AgentSelectedMsg{}
+	_ tea.Msg = AgentDeselectedMsg{}
+	_ tea.Msg = AgentDetailDataMsg{}
+)
 
 // DetectRole determines the agent role from a tmux session name.
 // Session format: gt-{rig}-{name}
@@ -347,4 +551,3 @@ func DetectRole(name string) string {
 		return "polecat"
 	}
 }
-

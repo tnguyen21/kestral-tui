@@ -30,6 +30,7 @@ type Model struct {
 	help        help.Model
 	showHelp    bool
 	lastRefresh time.Time
+	detailAgent *pane.AgentInfo // agent currently viewed in detail mode
 }
 
 // New creates a root Model with the given config.
@@ -124,6 +125,29 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		cmds = append(cmds, data.ScheduleConvoyPoll(
 			time.Duration(m.config.PollInterval.Convoys)*time.Second))
 		return m, tea.Batch(cmds...)
+
+	// Agent detail view messages
+	case pane.AgentSelectedMsg:
+		agent := msg.Agent
+		m.detailAgent = &agent
+		return m, fetchAgentDetailCmd(m.fetcher, agent.Rig, agent.Name)
+
+	case pane.AgentDeselectedMsg:
+		m.detailAgent = nil
+		return m, nil
+
+	case pane.AgentDetailDataMsg:
+		cmds := m.forwardToAllPanes(msg)
+		if m.detailAgent != nil {
+			cmds = append(cmds, data.ScheduleAgentDetailPoll(10*time.Second))
+		}
+		return m, tea.Batch(cmds...)
+
+	case data.AgentDetailTickMsg:
+		if m.detailAgent != nil {
+			return m, fetchAgentDetailCmd(m.fetcher, m.detailAgent.Rig, m.detailAgent.Name)
+		}
+		return m, nil
 	}
 
 	return m, nil
@@ -359,6 +383,21 @@ func fetchAgentsCmd(f *data.Fetcher) tea.Cmd {
 			}
 		}
 		return pane.AgentUpdateMsg{Agents: agents, Err: err}
+	}
+}
+
+// fetchAgentDetailCmd fetches git branch, commits, and tmux output for a specific agent.
+func fetchAgentDetailCmd(f *data.Fetcher, rig, name string) tea.Cmd {
+	return func() tea.Msg {
+		branch := f.FetchAgentBranch(rig, name)
+		commits := f.FetchAgentCommits(rig, name, 5)
+		output := f.FetchAgentOutput(rig, name, 15)
+		return pane.AgentDetailDataMsg{
+			Name:    name,
+			Branch:  branch,
+			Commits: commits,
+			Output:  output,
+		}
 	}
 }
 
