@@ -11,6 +11,7 @@ type StatusTickMsg time.Time
 type AgentTickMsg time.Time
 type ConvoyTickMsg time.Time
 type MailTickMsg time.Time
+type RefineryTickMsg time.Time
 
 // Result messages carry fetched data back to the model.
 type StatusUpdateMsg struct {
@@ -92,4 +93,11 @@ func FetchMailCmd(fetcher *Fetcher) tea.Cmd {
 type MailUpdateMsg struct {
 	Messages []MailMessage
 	Err      error
+}
+
+// ScheduleRefineryPoll returns a tea.Tick command for the next refinery poll.
+func ScheduleRefineryPoll(interval time.Duration) tea.Cmd {
+	return tea.Tick(interval, func(t time.Time) tea.Msg {
+		return RefineryTickMsg(t)
+	})
 }

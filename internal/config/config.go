@@ -11,10 +11,11 @@ import (
 const DefaultConfigPath = "~/.config/kestral/kestral.yaml"
 
 type PollInterval struct {
-	Status  int `yaml:"status"`
-	Agents  int `yaml:"agents"`
-	Convoys int `yaml:"convoys"`
-	Mail    int `yaml:"mail"`
+	Status   int `yaml:"status"`
+	Agents   int `yaml:"agents"`
+	Convoys  int `yaml:"convoys"`
+	Mail     int `yaml:"mail"`
+	Refinery int `yaml:"refinery"`
 }
 
 type Config struct {
@@ -31,10 +32,11 @@ func Default() Config {
 		TownRoot:   filepath.Join(home, "gt"),
 		HostKeyDir: filepath.Join(home, ".ssh"),
 		PollInterval: PollInterval{
-			Status:  10,
-			Agents:  5,
-			Convoys: 15,
-			Mail:    10,
+			Status:   10,
+			Agents:   5,
+			Convoys:  15,
+			Mail:     10,
+			Refinery: 10,
 		},
 	}
 }
@@ -92,6 +94,9 @@ func validate(cfg Config) error {
 	}
 	if cfg.PollInterval.Mail < 1 {
 		return fmt.Errorf("poll_interval.mail must be >= 1")
+	}
+	if cfg.PollInterval.Refinery < 1 {
+		return fmt.Errorf("poll_interval.refinery must be >= 1")
 	}
 
 	return nil

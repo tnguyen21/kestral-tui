@@ -41,6 +41,30 @@ type SessionInfo struct {
 	Activity int64 // unix timestamp
 }
 
+// MergeRequest represents a merge request in the refinery queue.
+type MergeRequest struct {
+	ID       string `json:"id"`
+	BeadID   string `json:"bead_id"`
+	Title    string `json:"title"`
+	Branch   string `json:"branch"`
+	Status   string `json:"status"` // queued, testing, merged, failed, skipped
+	QueuedAt string `json:"queued_at"`
+	MergedAt string `json:"merged_at"`
+	PRURL    string `json:"pr_url"`
+}
+
+// RefineryStatus holds the status of a single rig's refinery.
+type RefineryStatus struct {
+	Rig          string         `json:"rig"`
+	Running      bool           `json:"running"`
+	QueueDepth   int            `json:"queue_depth"`
+	Current      *MergeRequest  `json:"current"`
+	Queue        []MergeRequest `json:"queue"`
+	History      []MergeRequest `json:"history"`
+	SuccessRate  float64        `json:"success_rate"`
+	AvgMergeTime int            `json:"avg_merge_time_sec"`
+}
+
 // AgentDetail holds enriched agent info for the TUI agents pane.
 type AgentDetail struct {
 	Name       string `json:"name"`
