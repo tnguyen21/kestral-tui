@@ -183,8 +183,9 @@ func (p *WitnessPane) renderRows() []string {
 
 		// Show detail line for selected witness
 		if selected && w.HasSession {
-			detail := formatWitnessDetail(w, p.width)
-			rows = append(rows, detail)
+			if detail := formatWitnessDetail(w, p.width); detail != "" {
+				rows = append(rows, detail)
+			}
 		}
 	}
 	return rows
