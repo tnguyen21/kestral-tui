@@ -38,6 +38,7 @@ func New(cfg config.Config) Model {
 	panes := []pane.Pane{
 		pane.NewDashboard(),
 		pane.NewAgentsPane(),
+		pane.NewRefineryPane(),
 		pane.NewConvoysPane(),
 	}
 
@@ -74,6 +75,7 @@ func (m Model) Init() tea.Cmd {
 		fetchStatusCmd(m.fetcher),
 		fetchAgentsCmd(m.fetcher),
 		fetchConvoysCmd(m.fetcher),
+		fetchRefineryCmd(m.fetcher),
 	)
 }
 
@@ -105,6 +107,8 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, fetchAgentsCmd(m.fetcher)
 	case data.ConvoyTickMsg:
 		return m, fetchConvoysCmd(m.fetcher)
+	case data.RefineryTickMsg:
+		return m, fetchRefineryCmd(m.fetcher)
 
 	// Data update messages — forward to all panes and schedule next poll.
 	case pane.StatusUpdateMsg:
@@ -124,6 +128,12 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		cmds := m.forwardToAllPanes(msg)
 		cmds = append(cmds, data.ScheduleConvoyPoll(
 			time.Duration(m.config.PollInterval.Convoys)*time.Second))
+		return m, tea.Batch(cmds...)
+
+	case pane.RefineryUpdateMsg:
+		cmds := m.forwardToAllPanes(msg)
+		cmds = append(cmds, data.ScheduleRefineryPoll(
+			time.Duration(m.config.PollInterval.Refinery)*time.Second))
 		return m, tea.Batch(cmds...)
 	}
 
@@ -173,6 +183,7 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			fetchStatusCmd(m.fetcher),
 			fetchAgentsCmd(m.fetcher),
 			fetchConvoysCmd(m.fetcher),
+			fetchRefineryCmd(m.fetcher),
 		)
 	}
 
@@ -360,6 +371,14 @@ func fetchAgentsCmd(f *data.Fetcher) tea.Cmd {
 			}
 		}
 		return pane.AgentUpdateMsg{Agents: agents, Err: err}
+	}
+}
+
+// fetchRefineryCmd fetches refinery merge queue status and returns a pane.RefineryUpdateMsg.
+func fetchRefineryCmd(f *data.Fetcher) tea.Cmd {
+	return func() tea.Msg {
+		statuses, err := f.FetchRefineryStatus()
+		return pane.RefineryUpdateMsg{Statuses: statuses, Err: err}
 	}
 }
 

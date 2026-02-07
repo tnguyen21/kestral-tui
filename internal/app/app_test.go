@@ -29,8 +29,8 @@ func sized(m Model, w, h int) Model {
 func TestNew(t *testing.T) {
 	m := testModel()
 
-	if len(m.panes) != 3 {
-		t.Fatalf("expected 3 panes, got %d", len(m.panes))
+	if len(m.panes) != 4 {
+		t.Fatalf("expected 4 panes, got %d", len(m.panes))
 	}
 	if m.panes[0].ID() != pane.PaneDashboard {
 		t.Errorf("pane 0 should be Dashboard, got %d", m.panes[0].ID())
@@ -38,8 +38,11 @@ func TestNew(t *testing.T) {
 	if m.panes[1].ID() != pane.PaneAgents {
 		t.Errorf("pane 1 should be Agents, got %d", m.panes[1].ID())
 	}
-	if m.panes[2].ID() != pane.PaneConvoys {
-		t.Errorf("pane 2 should be Convoys, got %d", m.panes[2].ID())
+	if m.panes[2].ID() != pane.PaneRefinery {
+		t.Errorf("pane 2 should be Refinery, got %d", m.panes[2].ID())
+	}
+	if m.panes[3].ID() != pane.PaneConvoys {
+		t.Errorf("pane 3 should be Convoys, got %d", m.panes[3].ID())
 	}
 	if m.activePane != 0 {
 		t.Errorf("activePane should start at 0, got %d", m.activePane)
@@ -114,11 +117,18 @@ func TestTabKey(t *testing.T) {
 		t.Errorf("after tab: activePane = %d, want 1", m.activePane)
 	}
 
-	// Tab forward again
+	// Tab to pane 2
 	newM, _ = m.Update(tea.KeyMsg{Type: tea.KeyTab})
 	m = newM.(Model)
 	if m.activePane != 2 {
-		t.Errorf("after tab: activePane = %d, want 2", m.activePane)
+		t.Errorf("after second tab: activePane = %d, want 2", m.activePane)
+	}
+
+	// Tab to pane 3
+	newM, _ = m.Update(tea.KeyMsg{Type: tea.KeyTab})
+	m = newM.(Model)
+	if m.activePane != 3 {
+		t.Errorf("after third tab: activePane = %d, want 3", m.activePane)
 	}
 
 	// Tab wraps around
@@ -133,11 +143,11 @@ func TestShiftTabKey(t *testing.T) {
 	m := testModel()
 	m = sized(m, 80, 24)
 
-	// Shift+tab wraps backward (0 -> last pane)
+	// Shift+tab wraps backward (0 -> 3 with 4 panes)
 	newM, _ := m.Update(tea.KeyMsg{Type: tea.KeyShiftTab})
 	m = newM.(Model)
-	if m.activePane != len(m.panes)-1 {
-		t.Errorf("shift+tab from 0: activePane = %d, want %d", m.activePane, len(m.panes)-1)
+	if m.activePane != 3 {
+		t.Errorf("shift+tab from 0: activePane = %d, want 3", m.activePane)
 	}
 }
 
@@ -159,18 +169,25 @@ func TestNumberKeys(t *testing.T) {
 		t.Errorf("after '1': activePane = %d, want 0", m.activePane)
 	}
 
-	// Press "3" to go to convoys pane
+	// Press "3" to go to refinery pane
 	newM, _ = m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'3'}})
 	m = newM.(Model)
 	if m.activePane != 2 {
 		t.Errorf("after '3': activePane = %d, want 2", m.activePane)
 	}
 
-	// Press "4" - no pane 4 exists, should stay
+	// Press "4" to go to convoys pane
 	newM, _ = m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'4'}})
 	m = newM.(Model)
-	if m.activePane != 2 {
-		t.Errorf("after '4' (nonexistent): activePane = %d, want 2", m.activePane)
+	if m.activePane != 3 {
+		t.Errorf("after '4': activePane = %d, want 3", m.activePane)
+	}
+
+	// Press "5" - no pane 5 exists, should stay
+	newM, _ = m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'5'}})
+	m = newM.(Model)
+	if m.activePane != 3 {
+		t.Errorf("after '5' (nonexistent): activePane = %d, want 3", m.activePane)
 	}
 }
 
@@ -333,6 +350,22 @@ func TestAgentUpdateForwarding(t *testing.T) {
 	}
 }
 
+func TestRefineryUpdateForwarding(t *testing.T) {
+	m := testModel()
+	m = sized(m, 80, 24)
+
+	msg := pane.RefineryUpdateMsg{
+		Statuses: []data.RefineryStatus{
+			{Rig: "testrig", Running: true, QueueDepth: 2},
+		},
+	}
+
+	_, cmd := m.Update(msg)
+	if cmd == nil {
+		t.Error("should schedule next refinery poll")
+	}
+}
+
 func TestConvoyUpdateForwarding(t *testing.T) {
 	m := testModel()
 	m = sized(m, 80, 24)
@@ -368,6 +401,14 @@ func TestAgentTickTriggersCmd(t *testing.T) {
 	}
 }
 
+func TestRefineryTickTriggersCmd(t *testing.T) {
+	m := testModel()
+	_, cmd := m.Update(data.RefineryTickMsg(time.Now()))
+	if cmd == nil {
+		t.Error("RefineryTickMsg should trigger a fetch command")
+	}
+}
+
 func TestConvoyTickTriggersCmd(t *testing.T) {
 	m := testModel()
 	_, cmd := m.Update(data.ConvoyTickMsg(time.Now()))
@@ -400,6 +441,9 @@ func TestViewRendersTabBar(t *testing.T) {
 	}
 	if !containsText(v, "Agents") {
 		t.Error("View should contain Agents tab")
+	}
+	if !containsText(v, "Refinery") {
+		t.Error("View should contain Refinery tab")
 	}
 }
 
