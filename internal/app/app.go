@@ -38,6 +38,7 @@ func New(cfg config.Config) Model {
 	panes := []pane.Pane{
 		pane.NewDashboard(),
 		pane.NewAgentsPane(),
+		pane.NewConvoysPane(),
 	}
 
 	return Model{
@@ -370,6 +371,7 @@ func fetchConvoysCmd(f *data.Fetcher) tea.Cmd {
 			return pane.ConvoyUpdateMsg{}
 		}
 		progress := make(map[string][2]int)
+		issueMap := make(map[string][]data.IssueDetail)
 		for _, c := range convoys {
 			issues, err := f.FetchTrackedIssues(c.ID)
 			if err != nil {
@@ -382,7 +384,12 @@ func fetchConvoysCmd(f *data.Fetcher) tea.Cmd {
 				}
 			}
 			progress[c.ID] = [2]int{done, len(issues)}
+			issueMap[c.ID] = issues
 		}
-		return pane.ConvoyUpdateMsg{Convoys: convoys, Progress: progress}
+		return pane.ConvoyUpdateMsg{
+			Convoys:  convoys,
+			Progress: progress,
+			Issues:   issueMap,
+		}
 	}
 }

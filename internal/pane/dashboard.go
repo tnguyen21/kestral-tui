@@ -19,11 +19,13 @@ type StatusUpdateMsg struct {
 	FetchedAt time.Time
 }
 
-// ConvoyUpdateMsg delivers convoy data to the dashboard.
+// ConvoyUpdateMsg delivers convoy data to panes.
 type ConvoyUpdateMsg struct {
 	Convoys []data.ConvoyInfo
 	// Progress maps convoy ID to (done, total) counts.
 	Progress map[string][2]int
+	// Issues maps convoy ID to its tracked issue details.
+	Issues map[string][]data.IssueDetail
 }
 
 // Dashboard is the home screen pane showing system health at a glance.
