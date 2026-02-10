@@ -29,8 +29,8 @@ func sized(m Model, w, h int) Model {
 func TestNew(t *testing.T) {
 	m := testModel()
 
-	if len(m.panes) != 7 {
-		t.Fatalf("expected 7 panes, got %d", len(m.panes))
+	if len(m.panes) != 10 {
+		t.Fatalf("expected 10 panes, got %d", len(m.panes))
 	}
 	if m.panes[0].ID() != pane.PaneDashboard {
 		t.Errorf("pane 0 should be Dashboard, got %d", m.panes[0].ID())
@@ -41,17 +41,26 @@ func TestNew(t *testing.T) {
 	if m.panes[2].ID() != pane.PaneRefinery {
 		t.Errorf("pane 2 should be Refinery, got %d", m.panes[2].ID())
 	}
-	if m.panes[3].ID() != pane.PaneConvoys {
-		t.Errorf("pane 3 should be Convoys, got %d", m.panes[3].ID())
+	if m.panes[3].ID() != pane.PanePRs {
+		t.Errorf("pane 3 should be PRs, got %d", m.panes[3].ID())
 	}
-	if m.panes[4].ID() != pane.PaneResources {
-		t.Errorf("pane 4 should be Resources, got %d", m.panes[4].ID())
+	if m.panes[4].ID() != pane.PaneConvoys {
+		t.Errorf("pane 4 should be Convoys, got %d", m.panes[4].ID())
 	}
-	if m.panes[5].ID() != pane.PaneNewIssue {
-		t.Errorf("pane 5 should be NewIssue, got %d", m.panes[5].ID())
+	if m.panes[5].ID() != pane.PaneResources {
+		t.Errorf("pane 5 should be Resources, got %d", m.panes[5].ID())
 	}
-	if m.panes[6].ID() != pane.PaneMail {
-		t.Errorf("pane 6 should be Mail, got %d", m.panes[6].ID())
+	if m.panes[6].ID() != pane.PaneHistory {
+		t.Errorf("pane 6 should be History, got %d", m.panes[6].ID())
+	}
+	if m.panes[7].ID() != pane.PaneNewIssue {
+		t.Errorf("pane 7 should be NewIssue, got %d", m.panes[7].ID())
+	}
+	if m.panes[8].ID() != pane.PaneMail {
+		t.Errorf("pane 8 should be Mail, got %d", m.panes[8].ID())
+	}
+	if m.panes[9].ID() != pane.PaneWitness {
+		t.Errorf("pane 9 should be Witness, got %d", m.panes[9].ID())
 	}
 	if m.activePane != 0 {
 		t.Errorf("activePane should start at 0, got %d", m.activePane)
@@ -133,34 +142,48 @@ func TestTabKey(t *testing.T) {
 		t.Errorf("after 2nd tab: activePane = %d, want 2", m.activePane)
 	}
 
-	// Tab forward: 2 -> 3 (Convoys)
+	// Tab forward: 2 -> 3 (PRs)
 	newM, _ = m.Update(tea.KeyMsg{Type: tea.KeyTab})
 	m = newM.(Model)
 	if m.activePane != 3 {
 		t.Errorf("after 3rd tab: activePane = %d, want 3", m.activePane)
 	}
 
-	// Tab forward: 3 -> 4 (Resources)
+	// Tab forward: 3 -> 4 (Convoys)
 	newM, _ = m.Update(tea.KeyMsg{Type: tea.KeyTab})
 	m = newM.(Model)
 	if m.activePane != 4 {
 		t.Errorf("after 4th tab: activePane = %d, want 4", m.activePane)
 	}
 
-	// Tab forward: 4 -> 5 (NewIssue)
+	// Tab forward: 4 -> 5 (Resources)
 	newM, _ = m.Update(tea.KeyMsg{Type: tea.KeyTab})
 	m = newM.(Model)
 	if m.activePane != 5 {
 		t.Errorf("after 5th tab: activePane = %d, want 5", m.activePane)
 	}
 
-	// From pane 5 (NewIssue/input pane), tab is captured by the pane.
-	// Verify wrap from a non-input pane.
-	m.activePane = 4
+	// Tab forward: 5 -> 6 (History)
 	newM, _ = m.Update(tea.KeyMsg{Type: tea.KeyTab})
 	m = newM.(Model)
-	if m.activePane != 5 {
-		t.Errorf("tab from 4: activePane = %d, want 5", m.activePane)
+	if m.activePane != 6 {
+		t.Errorf("after 6th tab: activePane = %d, want 6", m.activePane)
+	}
+
+	// Tab forward: 6 -> 7 (NewIssue)
+	newM, _ = m.Update(tea.KeyMsg{Type: tea.KeyTab})
+	m = newM.(Model)
+	if m.activePane != 7 {
+		t.Errorf("after 7th tab: activePane = %d, want 7", m.activePane)
+	}
+
+	// From pane 7 (NewIssue/input pane), tab is captured by the pane.
+	// Verify wrap from a non-input pane.
+	m.activePane = 6
+	newM, _ = m.Update(tea.KeyMsg{Type: tea.KeyTab})
+	m = newM.(Model)
+	if m.activePane != 7 {
+		t.Errorf("tab from 6: activePane = %d, want 7", m.activePane)
 	}
 }
 
@@ -168,11 +191,11 @@ func TestShiftTabKey(t *testing.T) {
 	m := testModel()
 	m = sized(m, 80, 24)
 
-	// Shift+tab wraps backward: 0 -> 6 (last pane)
+	// Shift+tab wraps backward: 0 -> 9 (last pane)
 	newM, _ := m.Update(tea.KeyMsg{Type: tea.KeyShiftTab})
 	m = newM.(Model)
-	if m.activePane != 6 {
-		t.Errorf("shift+tab from 0: activePane = %d, want 6", m.activePane)
+	if m.activePane != 9 {
+		t.Errorf("shift+tab from 0: activePane = %d, want 9", m.activePane)
 	}
 }
 
@@ -201,31 +224,28 @@ func TestNumberKeys(t *testing.T) {
 		t.Errorf("after '3': activePane = %d, want 2", m.activePane)
 	}
 
-	// Press "4" to go to convoys pane
+	// Press "4" to go to PRs pane
 	newM, _ = m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'4'}})
 	m = newM.(Model)
 	if m.activePane != 3 {
 		t.Errorf("after '4': activePane = %d, want 3", m.activePane)
 	}
 
-	// Press "5" to go to resources pane
+	// Press "5" to go to convoys pane
 	newM, _ = m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'5'}})
 	m = newM.(Model)
 	if m.activePane != 4 {
 		t.Errorf("after '5': activePane = %d, want 4", m.activePane)
 	}
 
-	// Press "6" to go to new issue pane
+	// Press "6" to go to resources pane
 	newM, _ = m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'6'}})
 	m = newM.(Model)
 	if m.activePane != 5 {
 		t.Errorf("after '6': activePane = %d, want 5", m.activePane)
 	}
 
-	// Go back to a non-input pane (since pane 5 captures keys)
-	m.activePane = 0
-
-	// Press "7" to go to mail pane
+	// Press "7" to go to history pane
 	newM, _ = m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'7'}})
 	m = newM.(Model)
 	if m.activePane != 6 {
@@ -278,54 +298,28 @@ func TestRefreshKey(t *testing.T) {
 // Mouse clicks on tab bar
 // ---------------------------------------------------------------------------
 
-func TestMouseTabClick(t *testing.T) {
+func TestMouseHeaderOpensPicker(t *testing.T) {
 	m := testModel()
 	m = sized(m, 80, 24)
 
-	// Verify initial pane
-	if m.activePane != 0 {
-		t.Fatal("should start on pane 0")
+	if m.showPicker {
+		t.Fatal("picker should be closed initially")
 	}
 
-	// Find the x position that corresponds to pane 1 (Agents tab)
-	// In wide mode: " Dashboard " | " Agents "
-	// TabActiveStyle has Padding(0,1) + underline for active
-	// TabInactiveStyle has Padding(0,1)
-	// We need to find an x within the "Agents" tab
-	// The separator " | " is between tabs
-	// First tab: " Dashboard " (Dashboard is 9 chars + 2 padding = 11)
-	// Separator: " | " (3 chars)
-	// Second tab starts at 11 + 3 = 14
-	// Use tabAtX to find the correct position
-	agentIdx := m.tabAtX(14)
-	if agentIdx != 1 {
-		// Fall back to scanning for a valid position
-		for x := 0; x < m.width; x++ {
-			if m.tabAtX(x) == 1 {
-				agentIdx = 1
-				// Click at this position
-				newM, _ := m.Update(tea.MouseMsg{
-					X:      x,
-					Y:      0,
-					Button: tea.MouseButtonLeft,
-					Action: tea.MouseActionPress,
-				})
-				m = newM.(Model)
-				break
-			}
-		}
-	} else {
-		newM, _ := m.Update(tea.MouseMsg{
-			X:      14,
-			Y:      0,
-			Button: tea.MouseButtonLeft,
-			Action: tea.MouseActionPress,
-		})
-		m = newM.(Model)
-	}
+	// Click on header bar (row 0) should open picker
+	newM, _ := m.Update(tea.MouseMsg{
+		X:      5,
+		Y:      0,
+		Button: tea.MouseButtonLeft,
+		Action: tea.MouseActionPress,
+	})
+	m = newM.(Model)
 
-	if m.activePane != 1 {
-		t.Errorf("after clicking agents tab: activePane = %d, want 1", m.activePane)
+	if !m.showPicker {
+		t.Error("clicking header bar should open picker")
+	}
+	if m.pickerCursor != 0 {
+		t.Errorf("picker cursor should start at activePane (0), got %d", m.pickerCursor)
 	}
 }
 
@@ -408,6 +402,41 @@ func TestRefineryUpdateForwarding(t *testing.T) {
 	}
 }
 
+func TestPRUpdateForwarding(t *testing.T) {
+	m := testModel()
+	m = sized(m, 80, 24)
+
+	msg := pane.PRUpdateMsg{
+		PRs: []data.PRInfo{
+			{Number: 42, Title: "Fix bug", Author: data.PRAuthor{Login: "alice"}},
+		},
+	}
+
+	_, cmd := m.Update(msg)
+	if cmd == nil {
+		t.Error("should schedule next PR poll")
+	}
+}
+
+func TestHistoryUpdateForwarding(t *testing.T) {
+	m := testModel()
+	m = sized(m, 80, 24)
+
+	msg := pane.HistoryUpdateMsg{
+		ClosedBeads: []data.ClosedBeadInfo{
+			{ID: "kt-abc", Title: "Fix bug", Status: "closed", ClosedAt: "2026-02-07T01:00:00Z"},
+		},
+		Convoys: []data.AllConvoyInfo{
+			{ID: "cv-1", Title: "Convoy 1", Status: "closed"},
+		},
+	}
+
+	_, cmd := m.Update(msg)
+	if cmd == nil {
+		t.Error("should schedule next history poll")
+	}
+}
+
 func TestConvoyUpdateForwarding(t *testing.T) {
 	m := testModel()
 	m = sized(m, 80, 24)
@@ -451,6 +480,14 @@ func TestRefineryTickTriggersCmd(t *testing.T) {
 	}
 }
 
+func TestHistoryTickTriggersCmd(t *testing.T) {
+	m := testModel()
+	_, cmd := m.Update(data.HistoryTickMsg(time.Now()))
+	if cmd == nil {
+		t.Error("HistoryTickMsg should trigger a fetch command")
+	}
+}
+
 func TestConvoyTickTriggersCmd(t *testing.T) {
 	m := testModel()
 	_, cmd := m.Update(data.ConvoyTickMsg(time.Now()))
@@ -483,6 +520,38 @@ func TestResourceUpdateForwarding(t *testing.T) {
 	}
 }
 
+func TestWitnessTickTriggersCmd(t *testing.T) {
+	m := testModel()
+	_, cmd := m.Update(data.WitnessTickMsg(time.Now()))
+	if cmd == nil {
+		t.Error("WitnessTickMsg should trigger a fetch command")
+	}
+}
+
+func TestWitnessUpdateForwarding(t *testing.T) {
+	m := testModel()
+	m = sized(m, 80, 24)
+
+	msg := pane.WitnessUpdateMsg{
+		Witnesses: []pane.WitnessInfo{
+			{Rig: "gastown", Status: "alive", HasSession: true},
+		},
+	}
+
+	_, cmd := m.Update(msg)
+	if cmd == nil {
+		t.Error("should schedule next witness poll")
+	}
+}
+
+func TestPRTickTriggersCmd(t *testing.T) {
+	m := testModel()
+	_, cmd := m.Update(data.PRTickMsg(time.Now()))
+	if cmd == nil {
+		t.Error("PRTickMsg should trigger a fetch command")
+	}
+}
+
 // ---------------------------------------------------------------------------
 // View rendering
 // ---------------------------------------------------------------------------
@@ -494,7 +563,7 @@ func TestViewEmptySize(t *testing.T) {
 	}
 }
 
-func TestViewRendersTabBar(t *testing.T) {
+func TestViewRendersHeaderBar(t *testing.T) {
 	m := testModel()
 	m = sized(m, 80, 24)
 
@@ -503,13 +572,10 @@ func TestViewRendersTabBar(t *testing.T) {
 		t.Fatal("View should not be empty after resize")
 	}
 	if !containsText(v, "Dashboard") {
-		t.Error("View should contain Dashboard tab")
+		t.Error("View should contain active pane title 'Dashboard'")
 	}
-	if !containsText(v, "Agents") {
-		t.Error("View should contain Agents tab")
-	}
-	if !containsText(v, "Refinery") {
-		t.Error("View should contain Refinery tab")
+	if !containsText(v, "panes") {
+		t.Error("View should contain pane picker hint 'panes'")
 	}
 }
 
@@ -542,42 +608,43 @@ func TestViewShowsHelpWhenToggled(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
-// Tab bar rendering per layout mode
+// Header bar rendering
 // ---------------------------------------------------------------------------
 
-func TestTabBarNarrowMode(t *testing.T) {
-	m := testModel()
-	m = sized(m, 30, 20)
-
-	tabBar := m.renderTabBar()
-	// In narrow mode, tabs should use short titles (emojis)
-	if containsText(tabBar, "Dashboard") {
-		t.Error("narrow mode should not show full title 'Dashboard'")
-	}
-}
-
-func TestTabBarWideMode(t *testing.T) {
-	m := testModel()
-	m = sized(m, 100, 20)
-
-	tabBar := m.renderTabBar()
-	if !containsText(tabBar, "Dashboard") {
-		t.Error("wide mode should show full title 'Dashboard'")
-	}
-	if !containsText(tabBar, "|") {
-		t.Error("wide mode should have pipe separators")
-	}
-}
-
-func TestTabBarActivePaneHighlighted(t *testing.T) {
+func TestHeaderBarShowsActivePaneName(t *testing.T) {
 	m := testModel()
 	m = sized(m, 80, 24)
 
-	// activePane 0 = Dashboard should be rendered with accent style
-	// We can verify by checking the rendered output contains the expected tab
-	tabBar := m.renderTabBar()
-	if tabBar == "" {
-		t.Error("tab bar should not be empty")
+	header := m.renderHeaderBar()
+	if !containsText(header, "Dashboard") {
+		t.Error("header should show active pane title 'Dashboard'")
+	}
+}
+
+func TestHeaderBarShowsPaneCount(t *testing.T) {
+	m := testModel()
+	m = sized(m, 80, 24)
+
+	header := m.renderHeaderBar()
+	if !containsText(header, "1/10") {
+		t.Error("header should show '1/10' for first of 10 panes")
+	}
+}
+
+func TestHeaderBarUpdatesOnPaneSwitch(t *testing.T) {
+	m := testModel()
+	m = sized(m, 80, 24)
+
+	// Switch to agents pane
+	newM, _ := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'2'}})
+	m = newM.(Model)
+
+	header := m.renderHeaderBar()
+	if !containsText(header, "Agents") {
+		t.Error("header should show 'Agents' after switching")
+	}
+	if !containsText(header, "2/10") {
+		t.Error("header should show '2/10' for second pane")
 	}
 }
 
@@ -607,10 +674,10 @@ func TestStatusBarShowsEllipsisBeforeFirstRefresh(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
-// Tab label badge rendering
+// Picker badge rendering
 // ---------------------------------------------------------------------------
 
-func TestTabLabelWithBadge(t *testing.T) {
+func TestPickerShowsBadge(t *testing.T) {
 	m := testModel()
 	m = sized(m, 80, 24)
 
@@ -624,9 +691,9 @@ func TestTabLabelWithBadge(t *testing.T) {
 	newM, _ := m.Update(msg)
 	m = newM.(Model)
 
-	label := m.tabLabel(m.panes[1]) // Agents pane
+	label := m.pickerLabel(m.panes[1]) // Agents pane
 	if label != "Agents(2)" {
-		t.Errorf("tab label = %q, want %q", label, "Agents(2)")
+		t.Errorf("picker label = %q, want %q", label, "Agents(2)")
 	}
 }
 
@@ -672,44 +739,208 @@ func TestKeyForwardingToActivePane(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
-// tabAtX
+// Pane picker tests
 // ---------------------------------------------------------------------------
 
-func TestTabAtXFirstTab(t *testing.T) {
+func TestSpaceOpensPicker(t *testing.T) {
 	m := testModel()
 	m = sized(m, 80, 24)
 
-	// x=0 should be in the first tab
-	idx := m.tabAtX(0)
-	if idx != 0 {
-		t.Errorf("tabAtX(0) = %d, want 0", idx)
+	newM, _ := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{' '}})
+	m = newM.(Model)
+	if !m.showPicker {
+		t.Error("space should open picker")
 	}
 }
 
-func TestTabAtXOutOfBounds(t *testing.T) {
+func TestSpaceClosesPicker(t *testing.T) {
 	m := testModel()
 	m = sized(m, 80, 24)
+	m.showPicker = true
 
-	idx := m.tabAtX(200)
-	if idx != -1 {
-		t.Errorf("tabAtX(200) = %d, want -1", idx)
+	newM, _ := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{' '}})
+	m = newM.(Model)
+	if m.showPicker {
+		t.Error("space should close picker when open")
 	}
 }
 
-func TestTabAtXSecondTab(t *testing.T) {
+func TestEscClosesPicker(t *testing.T) {
+	m := testModel()
+	m = sized(m, 80, 24)
+	m.showPicker = true
+
+	newM, _ := m.Update(tea.KeyMsg{Type: tea.KeyEscape})
+	m = newM.(Model)
+	if m.showPicker {
+		t.Error("esc should close picker")
+	}
+}
+
+func TestPickerCursorNavigation(t *testing.T) {
+	m := testModel()
+	m = sized(m, 80, 24)
+	m.showPicker = true
+	m.pickerCursor = 0
+
+	// j moves down
+	newM, _ := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'j'}})
+	m = newM.(Model)
+	if m.pickerCursor != 1 {
+		t.Errorf("after j: pickerCursor = %d, want 1", m.pickerCursor)
+	}
+
+	// k moves up
+	newM, _ = m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'k'}})
+	m = newM.(Model)
+	if m.pickerCursor != 0 {
+		t.Errorf("after k: pickerCursor = %d, want 0", m.pickerCursor)
+	}
+
+	// k wraps to bottom
+	newM, _ = m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'k'}})
+	m = newM.(Model)
+	if m.pickerCursor != len(m.panes)-1 {
+		t.Errorf("after k wrap: pickerCursor = %d, want %d", m.pickerCursor, len(m.panes)-1)
+	}
+}
+
+func TestPickerEnterSelectsPane(t *testing.T) {
+	m := testModel()
+	m = sized(m, 80, 24)
+	m.showPicker = true
+	m.pickerCursor = 3
+
+	newM, _ := m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	m = newM.(Model)
+	if m.showPicker {
+		t.Error("enter should close picker")
+	}
+	if m.activePane != 3 {
+		t.Errorf("enter should select cursor pane: activePane = %d, want 3", m.activePane)
+	}
+}
+
+func TestPickerNumberKeySelects(t *testing.T) {
+	m := testModel()
+	m = sized(m, 80, 24)
+	m.showPicker = true
+
+	// Press "4" in picker → selects pane 3 (index)
+	newM, _ := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'4'}})
+	m = newM.(Model)
+	if m.showPicker {
+		t.Error("number key should close picker")
+	}
+	if m.activePane != 3 {
+		t.Errorf("number key '4' should select pane 3: activePane = %d", m.activePane)
+	}
+}
+
+func TestPickerKey0SelectsPane10(t *testing.T) {
+	m := testModel()
+	m = sized(m, 80, 24)
+	m.showPicker = true
+
+	// Press "0" in picker → selects pane 9 (index), 10th pane
+	newM, _ := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'0'}})
+	m = newM.(Model)
+	if m.showPicker {
+		t.Error("key 0 should close picker")
+	}
+	if m.activePane != 9 {
+		t.Errorf("key '0' should select pane 9: activePane = %d", m.activePane)
+	}
+}
+
+func TestPickerMouseClickRow(t *testing.T) {
+	m := testModel()
+	m = sized(m, 80, 24)
+	m.showPicker = true
+
+	// Row 0 = header bar, Row 1 = "Select Pane" title, Row 2+ = pane rows
+	// Click row 4 → pane index 2
+	newM, _ := m.Update(tea.MouseMsg{
+		X:      10,
+		Y:      4,
+		Button: tea.MouseButtonLeft,
+		Action: tea.MouseActionPress,
+	})
+	m = newM.(Model)
+	if m.showPicker {
+		t.Error("clicking pane row should close picker")
+	}
+	if m.activePane != 2 {
+		t.Errorf("clicking row 4 should select pane 2: activePane = %d", m.activePane)
+	}
+}
+
+func TestPickerMouseClickHeader(t *testing.T) {
+	m := testModel()
+	m = sized(m, 80, 24)
+	m.showPicker = true
+
+	// Click header bar (row 0) should dismiss picker
+	newM, _ := m.Update(tea.MouseMsg{
+		X:      5,
+		Y:      0,
+		Button: tea.MouseButtonLeft,
+		Action: tea.MouseActionPress,
+	})
+	m = newM.(Model)
+	if m.showPicker {
+		t.Error("clicking header while picker open should dismiss picker")
+	}
+}
+
+func TestInputPaneGuardsSpace(t *testing.T) {
 	m := testModel()
 	m = sized(m, 80, 24)
 
-	// Find the second tab's x range
-	found := false
-	for x := 0; x < 40; x++ {
-		if m.tabAtX(x) == 1 {
-			found = true
-			break
-		}
+	// Switch to NewIssue pane (index 7)
+	m.activePane = 7
+	if !m.inputPane() {
+		t.Fatal("pane 7 should be an input pane")
 	}
-	if !found {
-		t.Error("should be able to find second tab within x=0..39")
+
+	// Space should NOT open picker when input pane is active
+	newM, _ := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{' '}})
+	m = newM.(Model)
+	if m.showPicker {
+		t.Error("space should not open picker when input pane is active")
+	}
+}
+
+func TestPickerViewRendering(t *testing.T) {
+	m := testModel()
+	m = sized(m, 80, 24)
+	m.showPicker = true
+	m.pickerCursor = 0
+
+	v := m.View()
+	if !containsText(v, "Select Pane") {
+		t.Error("picker view should contain 'Select Pane' title")
+	}
+	if !containsText(v, "Dashboard") {
+		t.Error("picker view should contain 'Dashboard'")
+	}
+	if !containsText(v, "Agents") {
+		t.Error("picker view should contain 'Agents'")
+	}
+	if !containsText(v, "Witnesses") {
+		t.Error("picker view should contain 'Witnesses'")
+	}
+}
+
+func TestPickerTakesPriorityOverHelp(t *testing.T) {
+	m := testModel()
+	m = sized(m, 80, 24)
+	m.showHelp = true
+	m.showPicker = true
+
+	v := m.View()
+	if !containsText(v, "Select Pane") {
+		t.Error("picker should take priority over help in view")
 	}
 }
 
@@ -762,5 +993,5 @@ func stripANSI(s string) string {
 // Verify Model satisfies tea.Model at compile time.
 var _ tea.Model = Model{}
 
-// Verify lipgloss import is used (for width measurement in tabAtX).
+// Verify lipgloss import is used.
 var _ = lipgloss.Width

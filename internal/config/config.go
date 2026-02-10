@@ -17,6 +17,8 @@ type PollInterval struct {
 	Mail      int `yaml:"mail"`
 	Refinery  int `yaml:"refinery"`
 	Resources int `yaml:"resources"`
+	Witnesses int `yaml:"witnesses"`
+	PRs       int `yaml:"prs"`
 }
 
 type Config struct {
@@ -39,6 +41,8 @@ func Default() Config {
 			Mail:      10,
 			Refinery:  10,
 			Resources: 30,
+			Witnesses: 10,
+			PRs:       30,
 		},
 	}
 }
@@ -102,6 +106,12 @@ func validate(cfg Config) error {
 	}
 	if cfg.PollInterval.Resources < 1 {
 		return fmt.Errorf("poll_interval.resources must be >= 1")
+	}
+	if cfg.PollInterval.Witnesses < 1 {
+		return fmt.Errorf("poll_interval.witnesses must be >= 1")
+	}
+	if cfg.PollInterval.PRs < 1 {
+		return fmt.Errorf("poll_interval.prs must be >= 1")
 	}
 
 	return nil

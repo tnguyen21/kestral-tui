@@ -24,6 +24,10 @@ func TestDefaultKeyMap(t *testing.T) {
 		{"Pane5", km.Pane5, []string{"5"}},
 		{"Pane6", km.Pane6, []string{"6"}},
 		{"Pane7", km.Pane7, []string{"7"}},
+		{"Pane8", km.Pane8, []string{"8"}},
+		{"Pane9", km.Pane9, []string{"9"}},
+		{"Pane0", km.Pane0, []string{"0"}},
+		{"PanePicker", km.PanePicker, []string{" "}},
 		{"Up", km.Up, []string{"k", "up"}},
 		{"Down", km.Down, []string{"j", "down"}},
 		{"Select", km.Select, []string{"enter"}},
@@ -47,9 +51,12 @@ func TestDefaultKeyMap(t *testing.T) {
 	}
 }
 
-func TestPaneKeysOneToSeven(t *testing.T) {
+func TestPaneKeysOneToNine(t *testing.T) {
 	km := DefaultKeyMap()
-	panes := []key.Binding{km.Pane1, km.Pane2, km.Pane3, km.Pane4, km.Pane5, km.Pane6, km.Pane7}
+	panes := []key.Binding{
+		km.Pane1, km.Pane2, km.Pane3, km.Pane4,
+		km.Pane5, km.Pane6, km.Pane7, km.Pane8, km.Pane9,
+	}
 	for i, b := range panes {
 		keys := b.Keys()
 		if len(keys) != 1 {
@@ -59,5 +66,13 @@ func TestPaneKeysOneToSeven(t *testing.T) {
 		if keys[0] != expected {
 			t.Errorf("Pane%d: key = %q, want %q", i+1, keys[0], expected)
 		}
+	}
+}
+
+func TestPaneKeyZeroMapsToTen(t *testing.T) {
+	km := DefaultKeyMap()
+	keys := km.Pane0.Keys()
+	if len(keys) != 1 || keys[0] != "0" {
+		t.Errorf("Pane0 key = %v, want [\"0\"]", keys)
 	}
 }

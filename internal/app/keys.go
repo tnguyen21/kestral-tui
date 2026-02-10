@@ -15,8 +15,12 @@ type KeyMap struct {
 	Pane4    key.Binding
 	Pane5    key.Binding
 	Pane6    key.Binding
-	Pane7    key.Binding
-	Up       key.Binding
+	Pane7      key.Binding
+	Pane8      key.Binding
+	Pane9      key.Binding
+	Pane0      key.Binding
+	PanePicker key.Binding
+	Up         key.Binding
 	Down     key.Binding
 	Select   key.Binding
 	Back     key.Binding
@@ -66,6 +70,22 @@ func DefaultKeyMap() KeyMap {
 		Pane7: key.NewBinding(
 			key.WithKeys("7"),
 			key.WithHelp("7", "pane 7"),
+		),
+		Pane8: key.NewBinding(
+			key.WithKeys("8"),
+			key.WithHelp("8", "pane 8"),
+		),
+		Pane9: key.NewBinding(
+			key.WithKeys("9"),
+			key.WithHelp("9", "pane 9"),
+		),
+		Pane0: key.NewBinding(
+			key.WithKeys("0"),
+			key.WithHelp("0", "pane 10"),
+		),
+		PanePicker: key.NewBinding(
+			key.WithKeys(" "),
+			key.WithHelp("space", "pane picker"),
 		),
 		Up: key.NewBinding(
 			key.WithKeys("k", "up"),

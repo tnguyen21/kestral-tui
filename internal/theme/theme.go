@@ -38,6 +38,41 @@ var StatusBarStyle = lipgloss.NewStyle().
 	Foreground(ColorMuted).
 	Padding(0, 1)
 
+// Header bar styles (compact pane indicator replacing full tab bar).
+var (
+	HeaderBarStyle = lipgloss.NewStyle().
+			Background(lipgloss.AdaptiveColor{Light: "#e7e8e9", Dark: "#1f2430"}).
+			Foreground(ColorAccent).
+			Bold(true).
+			Padding(0, 1)
+
+	HeaderHintStyle = lipgloss.NewStyle().
+			Background(lipgloss.AdaptiveColor{Light: "#e7e8e9", Dark: "#1f2430"}).
+			Foreground(ColorMuted).
+			Padding(0, 1)
+)
+
+// Pane picker overlay styles.
+var (
+	PickerTitleStyle = lipgloss.NewStyle().
+				Foreground(ColorAccent).
+				Bold(true).
+				Padding(0, 1)
+
+	PickerRowStyle = lipgloss.NewStyle().
+			Foreground(ColorMuted).
+			Padding(0, 1)
+
+	PickerActiveRowStyle = lipgloss.NewStyle().
+				Foreground(ColorAccent).
+				Bold(true).
+				Padding(0, 1)
+
+	PickerCursorStyle = lipgloss.NewStyle().
+				Foreground(ColorAccent).
+				Bold(true)
+)
+
 // Pane styles.
 var (
 	PaneHeaderStyle = lipgloss.NewStyle().

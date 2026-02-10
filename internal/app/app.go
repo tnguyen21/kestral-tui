@@ -28,9 +28,11 @@ type Model struct {
 	fetcher     *data.Fetcher
 	config      *config.Config
 	help        help.Model
-	showHelp    bool
-	lastRefresh time.Time
-	detailAgent *pane.AgentInfo // agent currently viewed in detail mode
+	showHelp     bool
+	showPicker   bool
+	pickerCursor int
+	lastRefresh  time.Time
+	detailAgent  *pane.AgentInfo // agent currently viewed in detail mode
 }
 
 // New creates a root Model with the given config.
@@ -40,10 +42,13 @@ func New(cfg config.Config) Model {
 		pane.NewDashboard(),
 		pane.NewAgentsPane(),
 		pane.NewRefineryPane(),
+		pane.NewPRsPane(),
 		pane.NewConvoysPane(),
 		pane.NewResourcesPane(),
+		pane.NewHistoryPane(),
 		pane.NewNewIssuePane(),
 		pane.NewMailPane(),
+		pane.NewWitnessPane(),
 	}
 
 	return Model{
@@ -57,13 +62,13 @@ func New(cfg config.Config) Model {
 
 // ShortHelp implements help.KeyMap for the application key bindings.
 func (k KeyMap) ShortHelp() []key.Binding {
-	return []key.Binding{k.Quit, k.Tab, k.Help}
+	return []key.Binding{k.Quit, k.Tab, k.PanePicker, k.Help}
 }
 
 // FullHelp implements help.KeyMap for the application key bindings.
 func (k KeyMap) FullHelp() [][]key.Binding {
 	return [][]key.Binding{
-		{k.Quit, k.Tab, k.ShiftTab},
+		{k.Quit, k.Tab, k.ShiftTab, k.PanePicker},
 		{k.Pane1, k.Pane2, k.Pane3, k.Pane4},
 		{k.Up, k.Down, k.Select, k.Back},
 		{k.Refresh, k.Help},
@@ -79,10 +84,13 @@ func (m Model) Init() tea.Cmd {
 		fetchStatusCmd(m.fetcher),
 		fetchAgentsCmd(m.fetcher),
 		fetchConvoysCmd(m.fetcher),
+		fetchHistoryCmd(m.fetcher),
 		fetchRigsCmd(m.fetcher),
 		fetchMailCmd(m.fetcher),
 		fetchRefineryCmd(m.fetcher),
 		fetchResourcesCmd(m.fetcher),
+		fetchWitnessesCmd(m.fetcher),
+		fetchPRsCmd(m.fetcher),
 	)
 }
 
@@ -120,6 +128,12 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, fetchRefineryCmd(m.fetcher)
 	case data.ResourceTickMsg:
 		return m, fetchResourcesCmd(m.fetcher)
+	case data.WitnessTickMsg:
+		return m, fetchWitnessesCmd(m.fetcher)
+	case data.PRTickMsg:
+		return m, fetchPRsCmd(m.fetcher)
+	case data.HistoryTickMsg:
+		return m, fetchHistoryCmd(m.fetcher)
 
 	// Data update messages — forward to all panes and schedule next poll.
 	case pane.StatusUpdateMsg:
@@ -138,6 +152,12 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case pane.ConvoyUpdateMsg:
 		cmds := m.forwardToAllPanes(msg)
 		cmds = append(cmds, data.ScheduleConvoyPoll(
+			time.Duration(m.config.PollInterval.Convoys)*time.Second))
+		return m, tea.Batch(cmds...)
+
+	case pane.HistoryUpdateMsg:
+		cmds := m.forwardToAllPanes(msg)
+		cmds = append(cmds, data.ScheduleHistoryPoll(
 			time.Duration(m.config.PollInterval.Convoys)*time.Second))
 		return m, tea.Batch(cmds...)
 
@@ -190,28 +210,42 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		cmds = append(cmds, data.ScheduleResourcePoll(
 			time.Duration(m.config.PollInterval.Resources)*time.Second))
 		return m, tea.Batch(cmds...)
+
+	case pane.WitnessUpdateMsg:
+		cmds := m.forwardToAllPanes(msg)
+		cmds = append(cmds, data.ScheduleWitnessPoll(
+			time.Duration(m.config.PollInterval.Witnesses)*time.Second))
+		return m, tea.Batch(cmds...)
+
+	case pane.PRUpdateMsg:
+		cmds := m.forwardToAllPanes(msg)
+		cmds = append(cmds, data.SchedulePRPoll(
+			time.Duration(m.config.PollInterval.PRs)*time.Second))
+		return m, tea.Batch(cmds...)
 	}
 
 	return m, nil
 }
 
-// View renders the full UI: tab bar, active pane content, and status bar.
+// View renders the full UI: header bar, active pane content, and status bar.
 func (m Model) View() string {
 	if m.width == 0 || m.height == 0 {
 		return ""
 	}
 
-	tabBar := m.renderTabBar()
+	headerBar := m.renderHeaderBar()
 	statusBar := m.renderStatusBar()
 
 	var content string
-	if m.showHelp {
+	if m.showPicker {
+		content = m.renderPicker()
+	} else if m.showHelp {
 		content = m.help.View(m.keys)
 	} else if m.activePane < len(m.panes) {
 		content = m.panes[m.activePane].View()
 	}
 
-	return lipgloss.JoinVertical(lipgloss.Left, tabBar, content, statusBar)
+	return lipgloss.JoinVertical(lipgloss.Left, headerBar, content, statusBar)
 }
 
 // inputPane returns true if the active pane captures keyboard input
@@ -226,6 +260,11 @@ func (m Model) inputPane() bool {
 // handleKey processes global key bindings, forwarding unhandled keys
 // to the active pane.
 func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	// When the picker is open, route all keys through handlePickerKey.
+	if m.showPicker {
+		return m.handlePickerKey(msg)
+	}
+
 	// When an input-capturing pane is active, only handle ctrl+c for quit.
 	// All other keys go to the pane for text input.
 	if m.inputPane() {
@@ -241,6 +280,11 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 	case key.Matches(msg, m.keys.Help):
 		m.showHelp = !m.showHelp
+		return m, nil
+
+	case key.Matches(msg, m.keys.PanePicker):
+		m.showPicker = true
+		m.pickerCursor = m.activePane
 		return m, nil
 
 	case key.Matches(msg, m.keys.Tab):
@@ -259,6 +303,9 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			fetchMailCmd(m.fetcher),
 			fetchRefineryCmd(m.fetcher),
 			fetchResourcesCmd(m.fetcher),
+			fetchWitnessesCmd(m.fetcher),
+			fetchPRsCmd(m.fetcher),
+			fetchHistoryCmd(m.fetcher),
 		)
 	}
 
@@ -273,27 +320,35 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 }
 
 // paneKeyIndex returns the pane index if msg matches a pane number key.
+// Keys 1-9 map to indices 0-8; key 0 maps to index 9.
 func (m Model) paneKeyIndex(msg tea.KeyMsg) (int, bool) {
 	paneKeys := []key.Binding{
 		m.keys.Pane1, m.keys.Pane2, m.keys.Pane3,
 		m.keys.Pane4, m.keys.Pane5, m.keys.Pane6, m.keys.Pane7,
+		m.keys.Pane8, m.keys.Pane9,
 	}
 	for i, k := range paneKeys {
 		if key.Matches(msg, k) && i < len(m.panes) {
 			return i, true
 		}
 	}
+	// Key "0" maps to index 9 (10th pane).
+	if key.Matches(msg, m.keys.Pane0) && 9 < len(m.panes) {
+		return 9, true
+	}
 	return 0, false
 }
 
-// handleMouse processes mouse events, detecting tab bar clicks.
+// handleMouse processes mouse events, detecting header/picker clicks.
 func (m Model) handleMouse(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 	if msg.Button == tea.MouseButtonLeft && msg.Action == tea.MouseActionPress {
-		if msg.Y == 0 { // Tab bar row
-			if idx := m.tabAtX(msg.X); idx >= 0 {
-				m.activePane = idx
-				return m, nil
-			}
+		if m.showPicker {
+			return m.handlePickerMouse(msg)
+		}
+		if msg.Y == 0 { // Header bar row — open picker
+			m.showPicker = true
+			m.pickerCursor = m.activePane
+			return m, nil
 		}
 	}
 
@@ -329,67 +384,133 @@ func (m *Model) forwardToAllPanes(msg tea.Msg) []tea.Cmd {
 }
 
 // ---------------------------------------------------------------------------
-// Tab bar
+// Header bar (replaces tab bar)
 // ---------------------------------------------------------------------------
 
-// renderTabBar renders the tab bar across the top of the screen.
-func (m Model) renderTabBar() string {
-	var parts []string
-
-	for i, p := range m.panes {
-		label := m.tabLabel(p)
-		style := theme.TabInactiveStyle
-		if i == m.activePane {
-			style = theme.TabActiveStyle.Underline(true)
+// renderHeaderBar renders a compact header showing the active pane name
+// and a hint for opening the pane picker.
+func (m Model) renderHeaderBar() string {
+	var title string
+	if m.activePane < len(m.panes) {
+		p := m.panes[m.activePane]
+		title = p.ShortTitle() + " " + p.Title()
+		if badge := p.Badge(); badge > 0 {
+			title += fmt.Sprintf("(%d)", badge)
 		}
-		parts = append(parts, style.Render(label))
 	}
 
-	if m.layoutMode == LayoutWide {
-		sep := theme.MutedStyle.Render("|")
-		return strings.Join(parts, " "+sep+" ")
+	left := theme.HeaderBarStyle.Render(title)
+	hint := theme.HeaderHintStyle.Render(
+		fmt.Sprintf("%d/%d  ␣ panes", m.activePane+1, len(m.panes)))
+
+	gap := m.width - lipgloss.Width(left) - lipgloss.Width(hint)
+	if gap < 0 {
+		gap = 0
 	}
-	return strings.Join(parts, "")
+	filler := theme.HeaderBarStyle.Render(strings.Repeat(" ", gap))
+	return left + filler + hint
 }
 
-// tabLabel returns the display label for a pane tab in the current layout mode.
-func (m Model) tabLabel(p pane.Pane) string {
-	var label string
-	switch m.layoutMode {
-	case LayoutNarrow:
-		label = p.ShortTitle()
-	default:
-		label = p.Title()
+// ---------------------------------------------------------------------------
+// Pane picker overlay
+// ---------------------------------------------------------------------------
+
+// renderPicker renders a full-screen numbered list of all panes.
+func (m Model) renderPicker() string {
+	var b strings.Builder
+	b.WriteString(theme.PickerTitleStyle.Render("Select Pane"))
+	b.WriteString("\n")
+
+	for i, p := range m.panes {
+		// Number label: 1-9 for indices 0-8, 0 for index 9.
+		numKey := fmt.Sprintf("%d", i+1)
+		if i == 9 {
+			numKey = "0"
+		} else if i > 9 {
+			numKey = " "
+		}
+
+		label := p.Title()
+		if badge := p.Badge(); badge > 0 {
+			label += fmt.Sprintf("(%d)", badge)
+		}
+
+		row := fmt.Sprintf("%s %s  %s", numKey, p.ShortTitle(), label)
+
+		if i == m.pickerCursor {
+			cursor := theme.PickerCursorStyle.Render("▸ ")
+			b.WriteString(cursor + theme.PickerActiveRowStyle.Render(row))
+		} else {
+			b.WriteString("  " + theme.PickerRowStyle.Render(row))
+		}
+		b.WriteString("\n")
 	}
+
+	return b.String()
+}
+
+// handlePickerKey handles key events when the picker overlay is open.
+func (m Model) handlePickerKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	switch {
+	case key.Matches(msg, m.keys.Quit):
+		return m, tea.Quit
+
+	case key.Matches(msg, m.keys.Back):
+		m.showPicker = false
+		return m, nil
+
+	case key.Matches(msg, m.keys.PanePicker):
+		m.showPicker = false
+		return m, nil
+
+	case key.Matches(msg, m.keys.Select):
+		m.activePane = m.pickerCursor
+		m.showPicker = false
+		return m, nil
+
+	case key.Matches(msg, m.keys.Down):
+		m.pickerCursor = (m.pickerCursor + 1) % len(m.panes)
+		return m, nil
+
+	case key.Matches(msg, m.keys.Up):
+		m.pickerCursor = (m.pickerCursor - 1 + len(m.panes)) % len(m.panes)
+		return m, nil
+	}
+
+	// Number keys select directly from picker.
+	if idx, ok := m.paneKeyIndex(msg); ok {
+		m.activePane = idx
+		m.showPicker = false
+		return m, nil
+	}
+
+	return m, nil
+}
+
+// handlePickerMouse handles mouse events when the picker overlay is open.
+func (m Model) handlePickerMouse(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
+	// Row 0 is header bar — clicking it dismisses picker.
+	if msg.Y == 0 {
+		m.showPicker = false
+		return m, nil
+	}
+	// Picker rows start at Y=2 (row 1 is the "Select Pane" title).
+	paneRow := msg.Y - 2
+	if paneRow >= 0 && paneRow < len(m.panes) {
+		m.activePane = paneRow
+		m.showPicker = false
+		return m, nil
+	}
+	return m, nil
+}
+
+// pickerLabel returns the display label for a pane in the picker.
+func (m Model) pickerLabel(p pane.Pane) string {
+	label := p.Title()
 	if badge := p.Badge(); badge > 0 {
 		label += fmt.Sprintf("(%d)", badge)
 	}
 	return label
-}
-
-// tabAtX returns the pane index whose tab contains column x, or -1.
-func (m Model) tabAtX(x int) int {
-	pos := 0
-	for i, p := range m.panes {
-		// Account for separator in wide mode.
-		if m.layoutMode == LayoutWide && i > 0 {
-			sepWidth := 1 + lipgloss.Width(theme.MutedStyle.Render("|")) + 1 // " | "
-			pos += sepWidth
-		}
-
-		label := m.tabLabel(p)
-		style := theme.TabInactiveStyle
-		if i == m.activePane {
-			style = theme.TabActiveStyle.Underline(true)
-		}
-		tabWidth := lipgloss.Width(style.Render(label))
-
-		if x >= pos && x < pos+tabWidth {
-			return i
-		}
-		pos += tabWidth
-	}
-	return -1
 }
 
 // ---------------------------------------------------------------------------
@@ -446,6 +567,25 @@ func fetchAgentsCmd(f *data.Fetcher) tea.Cmd {
 			}
 		}
 		return pane.AgentUpdateMsg{Agents: agents, Err: err}
+	}
+}
+
+// fetchHistoryCmd fetches closed beads and all convoys for the history pane.
+func fetchHistoryCmd(f *data.Fetcher) tea.Cmd {
+	return func() tea.Msg {
+		beads, beadErr := f.FetchClosedBeads()
+		convoys, convoyErr := f.FetchAllConvoys()
+		var err error
+		if beadErr != nil {
+			err = beadErr
+		} else if convoyErr != nil {
+			err = convoyErr
+		}
+		return pane.HistoryUpdateMsg{
+			ClosedBeads: beads,
+			Convoys:     convoys,
+			Err:         err,
+		}
 	}
 }
 
@@ -543,5 +683,41 @@ func fetchConvoysCmd(f *data.Fetcher) tea.Cmd {
 			Progress: progress,
 			Issues:   issueMap,
 		}
+	}
+}
+
+// fetchWitnessesCmd fetches witness heartbeat data and returns a pane.WitnessUpdateMsg.
+func fetchWitnessesCmd(f *data.Fetcher) tea.Cmd {
+	return func() tea.Msg {
+		details, err := f.FetchWitnesses()
+		now := time.Now()
+		witnesses := make([]pane.WitnessInfo, len(details))
+		for i, d := range details {
+			var lastHeartbeat time.Duration
+			if d.LastHeartbeat > 0 {
+				lastHeartbeat = now.Sub(time.Unix(d.LastHeartbeat, 0))
+			}
+			var uptime time.Duration
+			if d.SessionCreated > 0 {
+				uptime = now.Sub(time.Unix(d.SessionCreated, 0))
+			}
+			witnesses[i] = pane.WitnessInfo{
+				Rig:           d.Rig,
+				Status:        d.Status,
+				LastHeartbeat: lastHeartbeat,
+				PolecatCount:  d.PolecatCount,
+				Uptime:        uptime,
+				HasSession:    d.HasSession,
+			}
+		}
+		return pane.WitnessUpdateMsg{Witnesses: witnesses, Err: err}
+	}
+}
+
+// fetchPRsCmd fetches open PRs and returns a pane.PRUpdateMsg.
+func fetchPRsCmd(f *data.Fetcher) tea.Cmd {
+	return func() tea.Msg {
+		prs, err := f.FetchPullRequests()
+		return pane.PRUpdateMsg{PRs: prs, Err: err}
 	}
 }

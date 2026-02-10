@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"os/exec"
 	"path/filepath"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -532,6 +533,24 @@ func (f *Fetcher) FetchResources() ([]SessionResource, error) {
 	return results, nil
 }
 
+// FetchPullRequests runs gh pr list --json for each rig discovered via git remotes
+// and returns aggregated PR info.
+func (f *Fetcher) FetchPullRequests() ([]PRInfo, error) {
+	stdout, err := runCmd(ghCmdTimeout, "gh", "pr", "list",
+		"--json", "number,title,author,headRefName,createdAt,isDraft,reviewDecision,mergeable,additions,deletions,changedFiles,url,statusCheckRollup",
+		"--limit", "50",
+	)
+	if err != nil {
+		return nil, fmt.Errorf("listing PRs: %w", err)
+	}
+
+	var prs []PRInfo
+	if err := json.Unmarshal(stdout.Bytes(), &prs); err != nil {
+		return nil, fmt.Errorf("parsing PR list: %w", err)
+	}
+	return prs, nil
+}
+
 // FetchConvoys runs bd list --type=convoy --status=open --json in TownRoot.
 func (f *Fetcher) FetchConvoys() ([]ConvoyInfo, error) {
 	stdout, err := f.runBdCmd("list", "--type=convoy", "--status=open", "--json")
@@ -542,6 +561,34 @@ func (f *Fetcher) FetchConvoys() ([]ConvoyInfo, error) {
 	var convoys []ConvoyInfo
 	if err := json.Unmarshal(stdout.Bytes(), &convoys); err != nil {
 		return nil, fmt.Errorf("parsing convoy list: %w", err)
+	}
+	return convoys, nil
+}
+
+// FetchClosedBeads runs bd list --status=closed --json in TownRoot.
+func (f *Fetcher) FetchClosedBeads() ([]ClosedBeadInfo, error) {
+	stdout, err := f.runBdCmd("list", "--status=closed", "--json")
+	if err != nil {
+		return nil, fmt.Errorf("listing closed beads: %w", err)
+	}
+
+	var beads []ClosedBeadInfo
+	if err := json.Unmarshal(stdout.Bytes(), &beads); err != nil {
+		return nil, fmt.Errorf("parsing closed beads: %w", err)
+	}
+	return beads, nil
+}
+
+// FetchAllConvoys runs gt convoy list --all --json and returns all convoys.
+func (f *Fetcher) FetchAllConvoys() ([]AllConvoyInfo, error) {
+	stdout, err := runCmd(cmdTimeout, "gt", "convoy", "list", "--all", "--json")
+	if err != nil {
+		return nil, fmt.Errorf("listing all convoys: %w", err)
+	}
+
+	var convoys []AllConvoyInfo
+	if err := json.Unmarshal(stdout.Bytes(), &convoys); err != nil {
+		return nil, fmt.Errorf("parsing all convoys: %w", err)
 	}
 	return convoys, nil
 }
@@ -629,4 +676,99 @@ func (f *Fetcher) FetchAgentOutput(rig, name string, lines int) string {
 		return ""
 	}
 	return stdout.String()
+}
+
+// FetchWitnesses detects witness sessions from tmux, computes heartbeat
+// status, and counts managed polecats per rig.
+func (f *Fetcher) FetchWitnesses() ([]WitnessDetail, error) {
+	stdout, err := runCmd(tmuxCmdTimeout, "tmux", "list-sessions", "-F",
+		"#{session_name}|#{window_activity}|#{session_created}")
+	if err != nil {
+		return nil, fmt.Errorf("listing tmux sessions: %w", err)
+	}
+
+	type sessionExt struct {
+		Name     string
+		Activity int64
+		Created  int64
+	}
+
+	var sessions []sessionExt
+	for _, line := range strings.Split(strings.TrimSpace(stdout.String()), "\n") {
+		if line == "" {
+			continue
+		}
+		parts := strings.SplitN(line, "|", 3)
+		if len(parts) < 3 {
+			continue
+		}
+		s := sessionExt{Name: parts[0]}
+		fmt.Sscanf(parts[1], "%d", &s.Activity)
+		fmt.Sscanf(parts[2], "%d", &s.Created)
+		sessions = append(sessions, s)
+	}
+
+	now := time.Now()
+
+	// Track all rigs and their polecats
+	allRigs := make(map[string]bool)
+	polecatCounts := make(map[string]int)
+	witnessSessions := make(map[string]sessionExt)
+
+	for _, s := range sessions {
+		if !strings.HasPrefix(s.Name, "gt-") {
+			continue
+		}
+		parts := strings.SplitN(s.Name, "-", 3)
+		if len(parts) != 3 {
+			continue
+		}
+		rig := parts[1]
+		name := parts[2]
+		allRigs[rig] = true
+
+		if name == "witness" {
+			witnessSessions[rig] = s
+		} else if name != "refinery" && name != "mayor" {
+			polecatCounts[rig]++
+		}
+	}
+
+	var witnesses []WitnessDetail
+	for rig := range allRigs {
+		wd := WitnessDetail{
+			Rig:          rig,
+			PolecatCount: polecatCounts[rig],
+		}
+
+		if ws, ok := witnessSessions[rig]; ok {
+			wd.HasSession = true
+			wd.LastHeartbeat = ws.Activity
+			wd.SessionCreated = ws.Created
+
+			if ws.Activity > 0 {
+				age := now.Sub(time.Unix(ws.Activity, 0))
+				switch {
+				case age < 5*time.Minute:
+					wd.Status = "alive"
+				case age < 15*time.Minute:
+					wd.Status = "stale"
+				default:
+					wd.Status = "dead"
+				}
+			} else {
+				wd.Status = "dead"
+			}
+		} else {
+			wd.Status = "dead"
+		}
+
+		witnesses = append(witnesses, wd)
+	}
+
+	sort.Slice(witnesses, func(i, j int) bool {
+		return witnesses[i].Rig < witnesses[j].Rig
+	})
+
+	return witnesses, nil
 }
