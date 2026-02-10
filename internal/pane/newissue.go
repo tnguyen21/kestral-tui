@@ -196,6 +196,11 @@ func (p *NewIssuePane) handleFormKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return p.submit()
 	}
 
+	// Enter submits the form, except in description field where it creates newlines
+	if msg.Type == tea.KeyEnter && p.activeField != fieldDescription {
+		return p.submit()
+	}
+
 	switch p.activeField {
 	case fieldTitle:
 		return p.handleTitleKey(msg)
@@ -462,7 +467,7 @@ func (p *NewIssuePane) renderForm() string {
 	b.WriteString("\n")
 
 	// Footer
-	footer := theme.MutedStyle.Render("ctrl+s submit  tab next field  ←/→ toggle  esc cancel")
+	footer := theme.MutedStyle.Render("enter/ctrl+s submit  tab next field  ←/→ toggle  esc cancel")
 	b.WriteString(TruncateWithEllipsis(footer, p.width))
 
 	return b.String()

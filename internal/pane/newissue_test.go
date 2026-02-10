@@ -170,6 +170,40 @@ func TestNewIssuePaneSubmitEmpty(t *testing.T) {
 	}
 }
 
+func TestNewIssuePaneSubmitWithEnter(t *testing.T) {
+	p := NewNewIssuePane()
+	p.SetSize(80, 24)
+
+	// Set a title
+	p.titleInput.SetValue("Test issue")
+
+	// Press Enter in title field — should submit
+	p.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	if p.state != stateSubmitting {
+		t.Errorf("Enter in title field should submit, got state %d", p.state)
+	}
+}
+
+func TestNewIssuePaneEnterInDescription(t *testing.T) {
+	p := NewNewIssuePane()
+	p.SetSize(80, 24)
+
+	// Navigate to description field
+	p.activeField = fieldDescription
+	p.description = []string{"first line"}
+	p.descLine = 0
+	p.descCursor = 10
+
+	// Press Enter in description — should create newline, NOT submit
+	p.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	if p.state != stateForm {
+		t.Errorf("Enter in description should stay in form, got state %d", p.state)
+	}
+	if len(p.description) != 2 {
+		t.Errorf("Enter in description should create newline, got %d lines", len(p.description))
+	}
+}
+
 func TestNewIssuePaneSetSize(t *testing.T) {
 	p := NewNewIssuePane()
 	p.SetSize(120, 40)
